@@ -1,0 +1,19 @@
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: "Space Grotesk", sans-serif;
+}
+
+input,
+select,
+textarea,
+button {
+    font-family: inherit;
+}
+
+table {
+    border-collapse: separate;
+    border-spacing: 0;
+}

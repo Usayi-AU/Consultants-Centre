@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: operations-dashboard
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate && gunicorn operations_dashboard.wsgi:application --log-file -
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: operations-dashboard-db
+          property: connectionString
+
+databases:
+  - name: operations-dashboard-db
+    databaseName: operations_dashboard
+    user: operations_dashboard
