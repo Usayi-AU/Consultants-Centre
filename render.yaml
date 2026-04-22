@@ -3,7 +3,8 @@ services:
     name: operations-dashboard
     runtime: python
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: python manage.py migrate && gunicorn operations_dashboard.wsgi:application --log-file -
+    preDeployCommand: python manage.py migrate && python manage.py seed_tracker_if_empty
+    startCommand: gunicorn operations_dashboard.wsgi:application --log-file -
     envVars:
       - key: SECRET_KEY
         generateValue: true

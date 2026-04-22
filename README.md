@@ -33,8 +33,13 @@ To import from a specific file path, run `python manage.py import_tracker --work
 	- a web service (`operations-dashboard`)
 	- a PostgreSQL database (`operations-dashboard-db`)
 4. Deploy the blueprint.
-5. After first deploy, open the web service Shell and run:
-	- `python manage.py import_tracker`
+
+During each deploy, Render now runs this automatically before app start:
+
+- `python manage.py migrate`
+- `python manage.py seed_tracker_if_empty`
+
+`seed_tracker_if_empty` only imports the workbook when there is no data yet, so existing admin updates are preserved.
 
 ### Local note after deployment changes
 
