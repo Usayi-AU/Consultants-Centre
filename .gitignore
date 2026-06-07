@@ -1,9 +1,4 @@
-.venv/
+venv/
 __pycache__/
 *.pyc
-db.sqlite3
-staticfiles/
-.pytest_cache/
-.mypy_cache/
-.coverage
-.DS_Store
+.env
