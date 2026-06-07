@@ -1,0 +1,90 @@
+{% extends 'crm/base.html' %}
+{% block title %}Client Action Items | Dashboard{% endblock %}
+{% block content %}
+<div class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-soft sm:p-8">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Action items</p>
+            <h2 class="mt-2 text-3xl font-bold text-slate-900">Client action item overview</h2>
+            <p class="mt-2 text-slate-600">Browse each client’s open work with clear status, owners, and deadlines.</p>
+        </div>
+        <div class="rounded-2xl bg-slate-900 px-4 py-3 text-white">
+            <p class="text-xs uppercase tracking-[0.2em] text-slate-300">Search</p>
+            <p class="mt-2 text-sm text-slate-100">Filter by client, owner, or action details.</p>
+        </div>
+    </div>
+
+    <div class="mt-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700">
+        {% if access_state.role == 'owner' %}
+            Viewing {{ access_state.owner }}'s items.
+        {% elif access_state.role == 'admin' %}
+            Admin access: full visibility across all action items.
+        {% else %}
+            General unlock access: all action items are visible.
+        {% endif %}
+    </div>
+
+    <form method="get" class="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
+        <input name="q" value="{{ q }}" placeholder="Search action items, client, or owner" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-slate-400 focus:outline-none" />
+        <button type="submit" class="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800">Search</button>
+        {% if q %}
+            <a href="{% url 'crm:client_action_items' %}" class="rounded-xl border border-slate-300 px-5 py-3 text-center font-semibold text-slate-700 transition hover:bg-white">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="mt-8 space-y-6">
+    {% for client, items in grouped_items %}
+        <section class="rounded-[24px] border border-slate-200 bg-white p-6 shadow-soft">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Client</p>
+                    <h3 class="mt-2 text-2xl font-bold text-slate-900">{{ client }}</h3>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{{ items|length }} items</span>
+            </div>
+            <div class="mt-5 overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Action Item</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Owner</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Target</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Update This Week</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for item in items %}
+                            <tr>
+                                <td class="px-4 py-3 text-sm text-slate-700">{{ item.action_item }}</td>
+                                <td class="px-4 py-3 text-sm">
+                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {% if item.status == 'Open' %}bg-blue-100 text-blue-800{% elif item.status == 'In Progress' %}bg-yellow-100 text-yellow-800{% elif item.status == 'On Hold' %}bg-orange-100 text-orange-800{% elif item.status == 'Done' %}bg-green-100 text-green-800{% else %}bg-slate-100 text-slate-800{% endif %}">
+                                        {{ item.status }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-sm text-slate-700">{{ item.owner }}</td>
+                                <td class="px-4 py-3 text-sm text-slate-700">{{ item.target_date|date:'d-M-y' }}</td>
+                                <td class="px-4 py-3 text-sm text-slate-700">{{ item.update_this_week|truncatechars:50 }}</td>
+                                <td class="px-4 py-3 text-sm">
+                                    {% if access_state.role == 'admin' or access_state.role == 'owner' and item.owner == access_state.owner %}
+                                        <a href="{% url 'crm:edit_action_item' item.pk %}" class="font-semibold text-indigo-600 hover:text-indigo-800">Edit</a>
+                                    {% endif %}
+                                    {% if access_state.role == 'admin' %}
+                                        <a href="{% url 'crm:delete_action_item' item.pk %}" class="ml-3 font-semibold text-red-600 hover:text-red-800">Delete</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {% empty %}
+        <div class="rounded-[24px] border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-slate-500">
+            No active action items found.
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

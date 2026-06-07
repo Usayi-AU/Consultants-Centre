@@ -1,4 +1,33 @@
+# Virtual environments
 venv/
+.venv/
+**/.venv/
+
+# Python cache
 __pycache__/
 *.pyc
-.env
+*.pyo
+
+# Django
+db.sqlite3
+staticfiles/
+
+# Testing / tooling
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# OS files
+.DS_Store
+
+# Project-specific temp files
+temp_detail.html
+excel_preview.json
+bd_sections.json
+
+# IDE
+.vscode/
+.idea/
+
+# Your nested project (avoid tracking inner git repo)
+Operations Dashboard/

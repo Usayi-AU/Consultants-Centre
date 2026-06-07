@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{% if obj %}Edit{% else %}Add{% endif %} Tender/Referral | IntelleGo{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-4xl rounded-[2rem] border border-white/80 bg-white p-8 shadow-panel">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Business Development Module</p>
+            <h2 class="mt-1 text-3xl font-semibold text-slate-900">{% if obj %}Edit{% else %}Add{% endif %} Tender/Referral</h2>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'tenders_list' %}">Back to Tenders</a>
+            <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href="{% url 'business_development_dashboard' %}">Back to IPS page</a>
+        </div>
+    </div>
+
+    <form method="post" class="space-y-5">
+        {% csrf_token %}
+        <div class="grid gap-5 md:grid-cols-2">
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_source_section">Section</label>
+                {{ form.source_section }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_client_name">Client name</label>
+                {{ form.client_name }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_business_type">Business type</label>
+                {{ form.business_type }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_contact_name">Contact name</label>
+                {{ form.contact_name }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_email_address">Email address</label>
+                {{ form.email_address }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_date_requested">Date requested</label>
+                {{ form.date_requested }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_date_submitted">Date submitted</label>
+                {{ form.date_submitted }}
+            </div>
+        </div>
+
+        <div>
+            <label class="mb-2 block text-sm font-medium text-slate-700" for="id_status_comments">Status / comments</label>
+            {{ form.status_comments }}
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            <button class="rounded-full bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800" type="submit">Save Tender</button>
+            <a class="rounded-full border border-slate-200 px-5 py-3 font-semibold text-slate-700" href="{% url 'tenders_list' %}">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

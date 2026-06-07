@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ item.investment_name }} | Alternative Investments | IntelleGo{% endblock %}
+{% block content %}
+<section class="space-y-6">
+    {% if is_alt_admin and form %}
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            <div class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Detailed Investment Review</p>
+                        <div class="mt-2 grid gap-3 md:grid-cols-[1.4fr_1fr]">
+                            <div>{{ form.investment_name }}</div>
+                            <div class="grid gap-3 md:grid-cols-3">
+                                <div>{{ form.category }}</div>
+                                <div>{{ form.risk }}</div>
+                                <div>{{ form.owner }}</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 grid gap-3 md:grid-cols-[180px_1fr]">
+                            <div>{{ form.status }}</div>
+                            <div class="self-center text-sm text-slate-500">Current investment status</div>
+                        </div>
+                        <p class="mt-3 text-sm text-slate-600">Click into any section below, edit the live text, and save.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'alt_investments_reviews' %}">Back to detailed investments</a>
+                    </div>
+                </div>
+            </div>
+
+            <section class="overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-panel">
+                <div class="border-b border-slate-200 px-4 py-4 md:px-5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Status Headline</p>
+                    <div class="mt-3 grid gap-3 md:grid-cols-[1fr_220px]">
+                        <div>{{ form.status_headline }}</div>
+                        <div>{{ form.status_headline_color }}</div>
+                    </div>
+                </div>
+                <div class="grid divide-y divide-slate-200 md:grid-cols-4 md:divide-x md:divide-y-0">
+                    <article class="min-h-full px-4 py-4 md:px-5 md:py-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[#1f3763]">Investment Details</p>
+                        <div class="mt-3">{{ form.investment_details }}</div>
+                    </article>
+                    <article class="min-h-full px-4 py-4 md:px-5 md:py-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[#1f3763]">Pension Funds Invested</p>
+                        <div class="mt-3">{{ form.pension_funds_invested }}</div>
+                    </article>
+                    <article class="min-h-full px-4 py-4 md:px-5 md:py-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[#1f3763]">Status & Developments</p>
+                        <div class="mt-3">{{ form.status_developments }}</div>
+                    </article>
+                    <article class="min-h-full px-4 py-4 md:px-5 md:py-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[#1f3763]">Performance</p>
+                        <div class="mt-3">{{ form.performance }}</div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="rounded-[1.75rem] border border-white/80 bg-white p-5 shadow-panel">
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Summary Update</p>
+                <div class="mt-3">{{ form.summary_update }}</div>
+            </section>
+
+            {# Record Details removed per request #}
+
+            <div class="flex justify-between gap-3">
+                <a class="rounded-full border border-red-300 px-6 py-3 font-semibold text-red-600 hover:bg-red-50" href="{% url 'alt_investment_delete' item.pk %}">Delete investment</a>
+                <div class="flex gap-3">
+                <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'alt_investments_reviews' %}">Back to detailed investments</a>
+                <button class="rounded-full bg-slate-950 px-6 py-3 font-semibold text-white" type="submit">Save changes</button>
+                </div>
+            </div>
+        </form>
+    {% else %}
+        <div class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Detailed Investment Review</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900 md:text-3xl">{{ item.investment_name }}</h2>
+                    <p class="mt-2 text-sm text-slate-600">Manager: {{ detail_meta.manager|default:item.owner|default:"-" }} · Class: {{ detail_meta.category|default:item.category|default:"-" }} · Risk: {{ detail_meta.risk|default:item.risk|default:"-" }}</p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'alt_investments_reviews' %}">Back to detailed investments</a>
+                </div>
+            </div>
+        </div>
+
+        <section class="overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-panel">
+            <div class="border-b border-slate-200 px-4 py-4 md:px-5">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Status Headline</p>
+                <div class="mt-3 inline-flex rounded-full px-4 py-2 text-sm font-semibold {{ status_headline_css }}">{{ status_headline }}</div>
+            </div>
+            <div class="grid divide-y divide-slate-200 md:grid-cols-4 md:divide-x md:divide-y-0">
+                {% for panel in panels %}
+                    <article class="min-h-full px-4 py-4 md:px-5 md:py-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[#1f3763]">{{ panel.title }}</p>
+                        {% if panel.headline %}
+                            <div class="mt-3 rounded-2xl {% if panel.title == 'Performance' %}bg-emerald-50 text-emerald-900{% else %}bg-slate-50 text-slate-800{% endif %} px-3 py-3 text-sm font-semibold">
+                                {{ panel.headline }}
+                            </div>
+                        {% endif %}
+                        {% if panel.bullets %}
+                            <ul class="mt-4 space-y-3 text-sm leading-6 text-slate-700">
+                                {% for line in panel.bullets %}
+                                    <li class="flex gap-2">
+                                        <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400"></span>
+                                        <span>{{ line }}</span>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="rounded-[1.75rem] border border-white/80 bg-white p-5 shadow-panel">
+            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Summary Update</p>
+            <p class="mt-3 whitespace-pre-line text-sm leading-7 text-slate-700">{{ item.summary_update|default:"No summary update captured." }}</p>
+        </section>
+    {% endif %}
+</section>
+{% endblock %}

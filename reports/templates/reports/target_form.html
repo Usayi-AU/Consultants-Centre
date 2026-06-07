@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}{% if obj %}Edit{% else %}Add{% endif %} Self-Generated Target | IntelleGo{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-3xl rounded-[2rem] border border-white/80 bg-white p-8 shadow-panel">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Business Development Module</p>
+            <h2 class="mt-1 text-3xl font-semibold text-slate-900">{% if obj %}Edit{% else %}Add{% endif %} Self-Generated Target</h2>
+            <p class="mt-2 text-sm text-slate-600">Select Internal Target or External Target and the system will allocate it to the correct workbook section.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'self_generated_list' %}#targets">Back to Targets</a>
+            <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href="{% url 'business_development_dashboard' %}">Back to IPS page</a>
+        </div>
+    </div>
+
+    <form method="post" class="space-y-5">
+        {% csrf_token %}
+        <div class="grid gap-5 md:grid-cols-2">
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_target_group">Target Type</label>
+                {{ form.target_group }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_client_name">Client Name</label>
+                {{ form.client_name }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_administrator">Administrator</label>
+                {{ form.administrator }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_business_target">Business Target</label>
+                {{ form.business_target }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_fund_size_usd_m">Fund Size (USD M)</label>
+                {{ form.fund_size_usd_m }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_contact_name">Contact Name</label>
+                {{ form.contact_name }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_email_address">Email Address</label>
+                {{ form.email_address }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_date_requested">Date Requested</label>
+                {{ form.date_requested }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_date_submitted">Date Submitted</label>
+                {{ form.date_submitted }}
+            </div>
+        </div>
+        <div>
+            <label class="mb-2 block text-sm font-medium text-slate-700" for="id_comments">Comments</label>
+            {{ form.comments }}
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <button class="rounded-full bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800" type="submit">Save Target</button>
+            <a class="rounded-full border border-slate-200 px-5 py-3 font-semibold text-slate-700" href="{% url 'self_generated_list' %}#targets">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

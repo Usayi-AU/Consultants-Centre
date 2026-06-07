@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Edit CRM Action Item | IntelleGo{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-3xl rounded-[2rem] border border-white/80 bg-white p-8 shadow-panel">
+    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">CRM Admin</p>
+    <h2 class="mt-2 text-3xl font-semibold text-slate-900">Edit action item</h2>
+    <p class="mt-2 text-sm text-slate-600">Update or correct details for {{ item.client_name }}.</p>
+    {% if is_crm_admin %}
+        <p class="mt-2 text-sm text-slate-600">Admin access allows full control, including status changes, clear, and delete.</p>
+    {% else %}
+        <p class="mt-2 text-sm text-slate-600">CRM owner access is limited to WIP updates and cannot delete or change client/owner fields.</p>
+    {% endif %}
+
+    <form method="post" class="mt-6 space-y-4">
+        {% csrf_token %}
+        {% if form.client_name %}
+            <div>{{ form.client_name.label_tag }}{{ form.client_name }}</div>
+        {% endif %}
+        {% if form.crm_owner %}
+            <div>{{ form.crm_owner.label_tag }}{{ form.crm_owner }}</div>
+        {% endif %}
+        <div>{{ form.action_item.label_tag }}{{ form.action_item }}</div>
+        <div>{{ form.progress_update.label_tag }}{{ form.progress_update }}</div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            {% if form.status %}
+                <div>{{ form.status.label_tag }}{{ form.status }}</div>
+            {% endif %}
+            <div>{{ form.due_date.label_tag }}{{ form.due_date }}</div>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <button class="rounded-2xl bg-slate-950 px-6 py-3 font-semibold text-white" type="submit">Save Changes</button>
+            <a class="rounded-2xl border border-slate-300 px-6 py-3 font-semibold text-slate-700" href="{% url 'crm_dashboard' %}">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

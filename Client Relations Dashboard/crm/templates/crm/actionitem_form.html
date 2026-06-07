@@ -1,0 +1,41 @@
+{% extends 'crm/base.html' %}
+{% block title %}{{ page_title }} | Dashboard{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-3xl">
+    <div class="rounded-[28px] border border-white/10 bg-white/95 p-6 shadow-soft sm:p-8">
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">{{ page_title }}</p>
+        <h2 class="mt-2 text-3xl font-bold text-slate-900">{{ page_title }}</h2>
+        <p class="mt-2 text-slate-600">{{ page_subtitle }}</p>
+
+        {% if not is_create %}
+            <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p class="text-xs font-semibold uppercase text-slate-500">Client</p>
+                <p class="mt-2 text-lg font-semibold text-slate-900">{{ item.client }}</p>
+            </div>
+        {% endif %}
+
+        <form method="post" class="mt-6 space-y-6">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="space-y-2">
+                    <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-slate-700">{{ field.label }}</label>
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-1 py-1 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-200 transition">
+                        {{ field }}
+                    </div>
+                    {% if field.errors %}
+                        <p class="text-sm text-red-600">{{ field.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <div class="flex flex-wrap gap-3 border-t border-slate-200 pt-4">
+                <button type="submit" class="rounded-full bg-indigo-600 px-6 py-3 font-semibold text-white transition hover:bg-indigo-700">{{ submit_label }}</button>
+                {% if is_create %}
+                    <a href="{% url cancel_url %}" class="rounded-full border border-slate-300 px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</a>
+                {% else %}
+                    <a href="{% url cancel_url cancel_args.0 %}" class="rounded-full border border-slate-300 px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

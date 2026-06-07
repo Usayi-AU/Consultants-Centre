@@ -1,0 +1,85 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Client Relations Dashboard{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'img/intellego-logo.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'img/intellego-logo.png' %}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    boxShadow: {
+                        soft: '0 20px 60px -24px rgba(15, 23, 42, 0.35)',
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+    <div class="pointer-events-none fixed inset-0 overflow-hidden">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(148,163,184,0.14),transparent_34%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)]"></div>
+    </div>
+
+    <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
+        <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+            <div class="flex items-center gap-3">
+                <img
+                    src="{% static 'img/intellego-logo.png' %}"
+                    alt="IntelleGo"
+                    class="h-12 w-auto shrink-0 rounded-md bg-white p-1 shadow-sm"
+                    onerror="this.style.display='none'"
+                >
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-600">Client Relations Dashboard</p>
+                    <h1 class="mt-2 text-2xl font-semibold text-slate-900">A clear view of client priorities, updates, and outcomes</h1>
+                    <p class="mt-1 text-sm text-slate-600">Live CRM summary, action items, and client hub in one modern workspace.</p>
+                </div>
+            </div>
+            <nav class="flex flex-wrap items-center gap-2">
+                <a href="{% url 'crm:dashboard' %}" class="rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">Dashboard</a>
+                <a href="{% url 'crm:client_action_items' %}" class="rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">Action Items</a>
+                <a href="{% url 'crm:client_hub' %}" class="rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">Client Hub</a>
+                {% if access_state.role == 'admin' or access_state.role == 'owner' %}
+                    <a href="{% url 'crm:create_action_item' %}" class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">New Action Item</a>
+                {% endif %}
+                {% if access_state.authenticated %}
+                    <form method="post" action="{% url 'crm:exit_dashboard' %}" class="inline-flex">
+                        {% csrf_token %}
+                        <button type="submit" class="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100">Exit</button>
+                    </form>
+                {% endif %}
+                {% if access_state.role == 'admin' %}
+                    <a href="{% url 'crm:admin_activity' %}" class="rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">Admin Activity</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <main class="relative mx-auto max-w-7xl px-4 pb-12 pt-8 sm:px-6 lg:px-8">
+        {% if messages %}
+            <div class="mb-6 space-y-3">
+                {% for message in messages %}
+                    <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-soft">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

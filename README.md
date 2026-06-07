@@ -1,11 +1,13 @@
-# Operations Reporting Dashboard
+# IntelleGo Consultants Centre
+
+Operations, Client Relations, Alternative Investments, and Business Development dashboards in one Django site.
 
 ## Setup
 
 1. Create and activate a virtual environment.
 2. Install dependencies with `pip install -r requirements.txt`.
 3. Run `python manage.py migrate`.
-4. Import the tracker data with `python manage.py import_tracker`.
+4. Import all dashboard workbooks from `static/` with `python manage.py import_all_dashboards`.
 5. Start the server with `python manage.py runserver`.
 
 ## Access Rules
@@ -21,16 +23,37 @@
 
 ## Workbook Import
 
-The importer reads the Excel workbook stored in the project root and maps the tracker rows into the database.
+Place the latest dashboard files in `static/`:
 
-To import from a specific file path, run `python manage.py import_tracker --workbook "C:/path/to/file.xlsx"`.
+| App | File pattern |
+|-----|----------------|
+| Operations | `Q1*Report Tracker*.xlsx` |
+| Client Relations | `Action_Items_Dashboard*.xlsx` |
+| Alternative Investments | `Alternative Investments*.docx` |
+| Business Development | `Intellego_IPS_Business_Development_Tracker.xlsx` |
 
-## Deploy on Render
+Import everything at once:
+
+```powershell
+python manage.py import_all_dashboards
+```
+
+Individual imports are also available: `import_tracker`, `import_excel`, `import_alt_investments`, and `import_bd_excel`.
+
+## Client Relations — exit session
+
+When unlocked, use **Exit** in the CRM header (all roles) or **Exit session** on the dashboard. This clears the `crm_access` session and returns you to the Consultants Centre hub.
+
+## Deploy on Render + GitHub
+
+See **[DEPLOY.md](DEPLOY.md)** for connecting Cursor to GitHub, pushing the repo, and deploying with Render Blueprint.
+
+Quick summary:
 
 1. Commit and push this project to GitHub.
-2. In Render, choose New + then Blueprint.
+2. In Render, choose **New** → **Blueprint**.
 3. Select this repository. Render will detect `render.yaml` and create:
-	- a web service (`operations-dashboard`)
+	- a web service (`consultants-centre`)
 	- a PostgreSQL database (`operations-dashboard-db`)
 4. Deploy the blueprint.
 

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Delete Alternative Investment | IntelleGo{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-2xl rounded-[2rem] border border-red-200 bg-red-50 p-8 shadow-panel">
+    <div class="space-y-6">
+        <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-red-600">Delete Investment</p>
+            <h2 class="mt-1 text-3xl font-semibold text-red-900">Are you sure?</h2>
+        </div>
+
+        <div class="rounded-xl bg-white p-4 border border-red-200">
+            <p class="text-sm text-slate-600">You are about to permanently delete:</p>
+            <p class="mt-2 text-lg font-semibold text-slate-900">{{ item.investment_name }}</p>
+            <p class="mt-1 text-sm text-slate-500">Manager: {{ item.owner }} • Category: {{ item.category }}</p>
+        </div>
+
+        <div class="rounded-xl bg-red-100 p-4 border border-red-300">
+            <p class="text-sm font-semibold text-red-900">⚠️ This action cannot be undone.</p>
+            <p class="mt-1 text-sm text-red-800">All details, updates, and historical data for this investment will be permanently removed.</p>
+        </div>
+
+        <div class="flex gap-3">
+            <form method="post" class="flex-1">
+                {% csrf_token %}
+                <button class="w-full rounded-full bg-red-600 px-6 py-3 font-semibold text-white hover:bg-red-700" type="submit">
+                    Yes, delete {{ item.investment_name }}
+                </button>
+            </form>
+            <a class="flex-1 rounded-full border border-slate-200 px-6 py-3 font-semibold text-slate-700 text-center hover:bg-slate-50" href="{% url 'alt_investment_detail' item.pk %}">Cancel</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

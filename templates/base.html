@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Operations Reporting Dashboard{% endblock %}</title>
+    <title>{% block title %}Consultancy Dashboards{% endblock %}</title>
     <link rel="icon" type="image/png" href="{% static 'img/intellego-logo.png' %}">
     <link rel="apple-touch-icon" href="{% static 'img/intellego-logo.png' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -48,23 +48,49 @@
                 >
                 <div>
                     <p class="text-xs uppercase tracking-[0.35em] text-slate-500">IntelleGo Investment Consultants</p>
-                    <h1 class="mt-1 text-lg font-semibold text-slate-900 sm:text-2xl">Operations Reporting Dashboard</h1>
+                    <h1 class="mt-1 text-lg font-semibold text-slate-900 sm:text-2xl">Consultants Centre</h1>
                 </div>
             </div>
-            {% if request.session.access_key %}
-                <nav class="flex flex-wrap items-center gap-2 text-sm">
-                    <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'dashboard' %}">Dashboard</a>
-                    <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'report_tracker' %}">Report Tracker</a>
-                    {% if request.session.access_level == 'admin' %}
-                        <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'operations_staff' %}">By Operations</a>
-                        <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="/admin/">Admin</a>
+            <nav class="flex flex-wrap items-center gap-2 text-sm">
+                <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'consultancy_hub' %}">Consultants Centre</a>
+
+                {% if request.path|slice:":5" == "/crm/" %}
+                    {% if request.session.crm_access %}
+                        <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'crm:dashboard' %}">Client Relations</a>
+                        <form method="post" action="{% url 'crm:exit_dashboard' %}" class="inline-block">
+                            {% csrf_token %}
+                            <button class="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 font-semibold text-rose-800 transition hover:bg-rose-100" type="submit">Exit Client Relations</button>
+                        </form>
                     {% endif %}
-                    <form method="post" action="{% url 'exit_access' %}" class="inline-block">
-                        {% csrf_token %}
-                        <button class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" type="submit">Exit</button>
-                    </form>
-                </nav>
-            {% endif %}
+                {% elif request.path|slice:":33" == "/dashboards/alternative-investments/" %}
+                    {% if request.session.alt_access_key %}
+                        <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'alt_investments_dashboard' %}">Alternative Investments</a>
+                        <form method="post" action="{% url 'alt_investments_exit' %}" class="inline-block">
+                            {% csrf_token %}
+                            <button class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" type="submit">Exit Alt</button>
+                        </form>
+                    {% endif %}
+                {% elif request.path|slice:":28" == "/dashboards/business-development/" %}
+                    {% if request.session.bd_access_key %}
+                        <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'business_development_dashboard' %}">Business Development</a>
+                        <form method="post" action="{% url 'business_development_exit' %}" class="inline-block">
+                            {% csrf_token %}
+                            <button class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" type="submit">Exit BD</button>
+                        </form>
+                    {% endif %}
+                {% elif request.path|slice:":11" == "/dashboard/" or request.path == "/dashboard" or request.path == "/tracker/" or request.path|slice:":12" == "/operations/" or request.path == "/unlock/" %}
+                    {% if request.session.access_key %}
+                        <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'dashboard' %}">Operations</a>
+                        {% if request.session.access_level == 'admin' %}
+                            <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'operations_staff' %}">By Operations</a>
+                        {% endif %}
+                        <form method="post" action="{% url 'exit_access' %}" class="inline-block">
+                            {% csrf_token %}
+                            <button class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" type="submit">Exit Ops</button>
+                        </form>
+                    {% endif %}
+                {% endif %}
+            </nav>
         </div>
     </header>
 

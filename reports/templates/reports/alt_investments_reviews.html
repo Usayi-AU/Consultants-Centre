@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Alternative Investments Reviews | IntelleGo{% endblock %}
+{% block content %}
+<section class="space-y-6">
+    <div class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Detailed Investment Reviews</p>
+                <h2 class="mt-1 text-2xl font-semibold text-slate-900">All investment records</h2>
+                <p class="mt-2 text-sm text-slate-600">Admins can review the full detail pages from here. Other users can only view updates.</p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                {% if is_alt_admin %}
+                    <a class="rounded-full bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700" href="{% url 'alt_investment_add' %}">+ Add investment</a>
+                {% endif %}
+                <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'alt_investments_dashboard' %}">Back to summary</a>
+                <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href="{% url 'alt_investments_exit' %}">Exit</a>
+            </div>
+        </div>
+    </div>
+
+    <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+        <form method="get" class="grid gap-3 md:grid-cols-[1fr_220px_auto]">
+            <input class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500" type="text" name="q" value="{{ search_query }}" placeholder="Search investments, managers, class, status notes">
+            <select class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500" name="status">
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button class="rounded-2xl bg-slate-950 px-5 py-3 font-semibold text-white" type="submit">Filter</button>
+        </form>
+    </section>
+
+    <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+        <div class="overflow-hidden rounded-3xl border border-slate-200">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-950 text-left text-slate-100">
+                        <tr>
+                            <th class="px-4 py-3 font-medium">Investment</th>
+                            <th class="px-4 py-3 font-medium">Manager</th>
+                            <th class="px-4 py-3 font-medium">Category</th>
+                            <th class="px-4 py-3 font-medium">Risk</th>
+                            <th class="px-4 py-3 font-medium">Status Headline</th>
+                            <th class="px-4 py-3 font-medium">Summary Update</th>
+                            <th class="px-4 py-3 font-medium">View</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white">
+                        {% for row in rows %}
+                            <tr class="align-top">
+                                <td class="px-4 py-4 font-medium text-slate-900">
+                                    <a class="underline decoration-slate-300 decoration-1 underline-offset-4 hover:text-[#1f3763] hover:decoration-[#1f3763]" href="{% url 'alt_investment_detail' row.item.pk %}">{{ row.item.investment_name }}</a>
+                                </td>
+                                <td class="px-4 py-4 text-slate-700">{{ row.item.owner|default:"-" }}</td>
+                                <td class="px-4 py-4 text-slate-700">{{ row.item.category|default:"-" }}</td>
+                                <td class="px-4 py-4 text-slate-700">{{ row.risk }}</td>
+                                <td class="px-4 py-4"><span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ row.status_preview_css }}">{{ row.status_preview }}</span></td>
+                                <td class="px-4 py-4 text-slate-700">{{ row.item.summary_update|default:"-" }}</td>
+                                <td class="px-4 py-4">
+                                    <a class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-[#1f3763] hover:text-[#1f3763]" href="{% url 'alt_investment_detail' row.item.pk %}">Open</a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td class="px-4 py-8 text-center text-slate-500" colspan="7">No alternative investment records matched the selected filter.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</section>
+{% endblock %}

@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}Client Hub | IntelleGo CRM{% endblock %}
+{% block content %}
+<section class="space-y-6">
+    <!-- Header Section -->
+    <div class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                {% if client_filter %}
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Client Hub</p>
+                    <h2 class="mt-1 text-3xl font-semibold text-slate-900">{{ client_filter }}</h2>
+                    <p class="mt-2 text-sm text-slate-600">All work in progress and completed action items for this client.</p>
+                {% else %}
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Client Relations</p>
+                    <h2 class="mt-1 text-3xl font-semibold text-slate-900">Client Hub</h2>
+                    <p class="mt-2 text-sm text-slate-600">Open a client to see all work in progress and completed action items with update history.</p>
+                {% endif %}
+            </div>
+            <div class="flex flex-wrap gap-2">
+                {% if client_filter %}
+                    <a class="rounded-full bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-300" href="{% url 'crm_client_hub' %}">Back to Clients</a>
+                {% endif %}
+                <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800" href="{% url 'crm_dashboard' %}">Back to CRM Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    {% if client_filter %}
+        <!-- Client-Specific Summary -->
+        <div class="grid gap-4 md:grid-cols-4">
+            <div class="rounded-[1.75rem] border border-white/80 bg-white p-5 shadow-panel">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Total Items</p>
+                <p class="mt-3 text-4xl font-semibold text-slate-900">{{ total_items }}</p>
+            </div>
+            <div class="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-5 shadow-panel">
+                <p class="text-xs uppercase tracking-[0.3em] text-amber-700">Work in Progress</p>
+                <p class="mt-3 text-4xl font-semibold text-amber-900">{{ in_progress_count }}</p>
+            </div>
+            <div class="rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5 shadow-panel">
+                <p class="text-xs uppercase tracking-[0.3em] text-emerald-700">Completed</p>
+                <p class="mt-3 text-4xl font-semibold text-emerald-900">{{ completed_count }}</p>
+            </div>
+            <div class="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 shadow-panel">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-600">Latest Update</p>
+                <p class="mt-3 text-base font-semibold text-slate-900">{% if latest_updated_harare %}{{ latest_updated_harare|date:"d M Y H:i" }}{% else %}No updates yet{% endif %}</p>
+            </div>
+        </div>
+    {% else %}
+        <!-- Global Summary -->
+        <div class="grid gap-4 md:grid-cols-4">
+            <div class="rounded-[1.75rem] border border-white/80 bg-white p-5 shadow-panel">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Total Items</p>
+                <p class="mt-3 text-4xl font-semibold text-slate-900">{{ total_items }}</p>
+            </div>
+            <div class="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-5 shadow-panel">
+                <p class="text-xs uppercase tracking-[0.3em] text-amber-700">Work in Progress</p>
+                <p class="mt-3 text-4xl font-semibold text-amber-900">{{ in_progress_count }}</p>
+            </div>
+            <div class="rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5 shadow-panel">
+                <p class="text-xs uppercase tracking-[0.3em] text-emerald-700">Completed</p>
+                <p class="mt-3 text-4xl font-semibold text-emerald-900">{{ completed_count }}</p>
+            </div>
+            <div class="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 shadow-panel">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-600">Latest Update</p>
+                <p class="mt-3 text-base font-semibold text-slate-900">{% if latest_updated_harare %}{{ latest_updated_harare|date:"d M Y H:i" }}{% else %}No updates yet{% endif %}</p>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Client Picker (Only show when no client is selected) -->
+    {% if not client_filter %}
+        <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+            <form method="get" class="flex flex-wrap items-end gap-3">
+                <div class="min-w-[280px] flex-1">
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="client_filter">Pick a client</label>
+                    <select id="client_filter" name="client" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500">
+                        <option value="">All clients</option>
+                        {% for client in clients %}
+                            <option value="{{ client }}">{{ client }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button class="rounded-2xl bg-slate-950 px-5 py-3 font-semibold text-white" type="submit">Open Hub</button>
+            </form>
+        </section>
+    {% endif %}
+
+    <!-- Client Overview Table (Only show when no client is selected) -->
+    {% if not client_filter %}
+        <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+            <div class="mb-4">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Client Overview</p>
+                <h2 class="mt-1 text-2xl font-semibold text-slate-900">All action items per client</h2>
+            </div>
+
+            <div class="overflow-hidden rounded-3xl border border-slate-200">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50 text-left text-slate-600">
+                        <tr>
+                            <th class="px-4 py-3 font-medium">Client</th>
+                            <th class="px-4 py-3 font-medium">Total</th>
+                            <th class="px-4 py-3 font-medium">Completed</th>
+                            <th class="px-4 py-3 font-medium">WIP</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white">
+                        {% for row in client_counts %}
+                            <tr>
+                                <td class="px-4 py-3 font-medium text-slate-900">
+                                    <a class="underline decoration-slate-300 underline-offset-4" href="?client={{ row.client_name|urlencode }}">{{ row.client_name }}</a>
+                                </td>
+                                <td class="px-4 py-3 text-slate-700">{{ row.total }}</td>
+                                <td class="px-4 py-3 text-emerald-700 font-semibold">{{ row.completed }}</td>
+                                <td class="px-4 py-3 text-amber-700 font-semibold">{{ row.in_progress }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td class="px-4 py-8 text-center text-slate-500" colspan="4">No client records available.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- WIP and Completed Items for All Clients -->
+        <div class="grid gap-6 lg:grid-cols-2">
+            <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                <div class="mb-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Work in Progress</p>
+                    <h3 class="mt-1 text-2xl font-semibold text-slate-900">Open items</h3>
+                </div>
+                <div class="space-y-3">
+                    {% for item in items %}
+                        {% if item.status == 'in_progress' %}
+                            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-sm font-semibold text-amber-900">{{ item.client_name }}</p>
+                                        <p class="text-sm text-amber-900">{{ item.action_item }}</p>
+                                        <p class="text-xs text-amber-800">Due: {% if item.due_date %}{{ item.due_date|date:"d M Y" }}{% else %}No due date{% endif %}</p>
+                                        <p class="text-xs text-amber-800">{{ item.progress_update|default:"No update yet" }}</p>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <a class="rounded-full border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800" href="{% url 'crm_item_history' item.pk %}">History</a>
+                                        <a class="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700" href="{% url 'crm_edit_item' item.pk %}">Edit WIP</a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% empty %}
+                        <p class="text-sm text-slate-500">No work in progress items.</p>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                <div class="mb-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Completed</p>
+                    <h3 class="mt-1 text-2xl font-semibold text-slate-900">Finished items</h3>
+                </div>
+                <div class="space-y-3">
+                    {% for item in items %}
+                        {% if item.status == 'completed' %}
+                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-sm font-semibold text-emerald-900">{{ item.client_name }}</p>
+                                        <p class="text-sm text-emerald-900">{{ item.action_item }}</p>
+                                        <p class="text-xs text-emerald-800">Completed: {{ item.updated_at|date:"d M Y" }}</p>
+                                        <p class="text-xs text-emerald-800">{{ item.progress_update|default:"Completed" }}</p>
+                                    </div>
+                                    <a class="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-800" href="{% url 'crm_item_history' item.pk %}">History</a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% empty %}
+                        <p class="text-sm text-slate-500">No completed items.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+    {% else %}
+        <!-- Client-Specific View -->
+        <div class="grid gap-6 lg:grid-cols-2">
+            <!-- WIP Items for Selected Client -->
+            <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                <div class="mb-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Work in Progress</p>
+                    <h3 class="mt-1 text-2xl font-semibold text-slate-900">Open items</h3>
+                </div>
+                <div class="space-y-3">
+                    {% if wip_items %}
+                        {% for item in wip_items %}
+                            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="flex-1">
+                                        <p class="text-sm font-semibold text-amber-900">{{ item.action_item }}</p>
+                                        <p class="text-xs text-amber-800 mt-1">Owner: {{ item.crm_owner }}</p>
+                                        <p class="text-xs text-amber-800">Due: {% if item.due_date %}{{ item.due_date|date:"d M Y" }}{% else %}No due date{% endif %}</p>
+                                        {% if item.progress_update %}
+                                            <p class="text-xs text-amber-800 mt-1">{{ item.progress_update }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <a class="rounded-full border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800" href="{% url 'crm_item_history' item.pk %}">History</a>
+                                        <a class="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700" href="{% url 'crm_edit_item' item.pk %}">Edit WIP</a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-sm text-slate-500">No work in progress items for this client.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- Completed Items for Selected Client -->
+            <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                <div class="mb-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Completed</p>
+                    <h3 class="mt-1 text-2xl font-semibold text-slate-900">Finished items</h3>
+                </div>
+                <div class="space-y-3">
+                    {% if completed_items %}
+                        {% for item in completed_items %}
+                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="flex-1">
+                                        <p class="text-sm font-semibold text-emerald-900">{{ item.action_item }}</p>
+                                        <p class="text-xs text-emerald-800 mt-1">Owner: {{ item.crm_owner }}</p>
+                                        <p class="text-xs text-emerald-800">Completed: {% if item.due_date %}{{ item.due_date|date:"d M Y" }}{% else %}{{ item.updated_at|date:"d M Y" }}{% endif %}</p>
+                                        {% if item.progress_update %}
+                                            <p class="text-xs text-emerald-800 mt-1">{{ item.progress_update }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <a class="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-800" href="{% url 'crm_item_history' item.pk %}">History</a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-sm text-slate-500">No completed items for this client.</p>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+
+        <!-- Update History for Selected Client -->
+        <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+            <div class="mb-4">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Update History</p>
+                <h3 class="mt-1 text-2xl font-semibold text-slate-900">Changes for {{ client_filter }}</h3>
+            </div>
+            <div class="space-y-3">
+                {% if selected_client_history %}
+                    {% for history in selected_client_history %}
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div class="flex-1">
+                                    <p class="font-semibold text-slate-900">{{ history.action_item_text }}</p>
+                                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">{{ history.get_action_type_display }} · {{ history.created_at|date:"d M Y H:i" }}</p>
+                                    {% if history.progress_update %}
+                                        <p class="text-sm text-slate-700 mt-2">{{ history.progress_update }}</p>
+                                    {% endif %}
+                                </div>
+                                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 whitespace-nowrap">{{ history.get_status_display }}</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-sm text-slate-500">No history records found for this client.</p>
+                {% endif %}
+            </div>
+        </section>
+    {% endif %}
+</section>
+{% endblock %}

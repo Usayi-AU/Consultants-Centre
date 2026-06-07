@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{% if obj %}Edit{% else %}Add{% endif %} IPS Review | IntelleGo{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-4xl rounded-[2rem] border border-white/80 bg-white p-8 shadow-panel">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Business Development Module</p>
+            <h2 class="mt-1 text-3xl font-semibold text-slate-900">{% if obj %}Edit{% else %}Add{% endif %} IPS Review</h2>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'business_development_dashboard' %}">Back to IPS page</a>
+            <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href="{% url 'tenders_list' %}">Tenders, Referrals & Other</a>
+        </div>
+    </div>
+
+    <form method="post" class="space-y-5">
+        {% csrf_token %}
+        <div class="grid gap-5 md:grid-cols-2">
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_fund_name">Fund name</label>
+                {{ form.fund_name }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_ic_crm">IC CRM</label>
+                {{ form.ic_crm }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_administrator">Administrator</label>
+                {{ form.administrator }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_admin_crm">Admin CRM</label>
+                {{ form.admin_crm }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_replacement_ratios">Replacement ratios</label>
+                {{ form.replacement_ratios }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_asset_mgr_mandates">Asset mgr mandates</label>
+                {{ form.asset_mgr_mandates }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_date_data_received">Date data received</label>
+                {{ form.date_data_received }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_date_sent_to_client">Date sent to client</label>
+                {{ form.date_sent_to_client }}
+            </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-3">
+            <label class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">{{ form.member_fin_schedules }} <span>Member fin schedules</span></label>
+            <label class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">{{ form.financial_review }} <span>Financial review</span></label>
+            <label class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">{{ form.workshop_required }} <span>Workshop required</span></label>
+        </div>
+
+        <div>
+            <label class="mb-2 block text-sm font-medium text-slate-700" for="id_status_comments">Status / comments</label>
+            {{ form.status_comments }}
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            <button class="rounded-full bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800" type="submit">Save IPS Review</button>
+            <a class="rounded-full border border-slate-200 px-5 py-3 font-semibold text-slate-700" href="{% url 'business_development_dashboard' %}">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

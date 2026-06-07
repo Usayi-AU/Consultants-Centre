@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{% if item %}Edit{% else %}Add{% endif %} Alternative Investment | IntelleGo{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-4xl rounded-[2rem] border border-white/80 bg-white p-8 shadow-panel">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Admin {% if item %}Edit{% else %}Add New{% endif %}</p>
+            <h2 class="mt-1 text-3xl font-semibold text-slate-900">{% if item %}{{ item.investment_name }}{% else %}New Alternative Investment{% endif %}</h2>
+        </div>
+        <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'alt_investments_reviews' %}">Back to reviews</a>
+    </div>
+
+    <form method="post" class="mt-8 grid gap-4 md:grid-cols-2">
+        {% csrf_token %}
+        <div>{{ form.investment_name.label_tag }}{{ form.investment_name }}</div>
+        <div>{{ form.category.label_tag }}{{ form.category }}</div>
+        <div>{{ form.risk.label_tag }}{{ form.risk }}</div>
+        <div>{{ form.owner.label_tag }}{{ form.owner }}</div>
+        <div>{{ form.status.label_tag }}{{ form.status }}</div>
+        <div>{{ form.status_headline.label_tag }}{{ form.status_headline }}</div>
+        <div>{{ form.status_headline_color.label_tag }}{{ form.status_headline_color }}</div>
+        <div class="md:col-span-2">{{ form.investment_details.label_tag }}{{ form.investment_details }}</div>
+        <div class="md:col-span-2">{{ form.pension_funds_invested.label_tag }}{{ form.pension_funds_invested }}</div>
+        <div class="md:col-span-2">{{ form.status_developments.label_tag }}{{ form.status_developments }}</div>
+        <div class="md:col-span-2">{{ form.performance.label_tag }}{{ form.performance }}</div>
+        <div>{{ form.last_update.label_tag }}{{ form.last_update }}</div>
+        <div>{{ form.next_review_date.label_tag }}{{ form.next_review_date }}</div>
+        <div class="md:col-span-2">{{ form.summary_update.label_tag }}{{ form.summary_update }}</div>
+        <div class="md:col-span-2">{{ form.detailed_review.label_tag }}{{ form.detailed_review }}</div>
+        <div class="md:col-span-2 flex gap-3">
+            {% if item %}
+                <a class="rounded-full border border-red-300 px-6 py-3 font-semibold text-red-600 hover:bg-red-50" href="{% url 'alt_investment_delete' item.pk %}">Delete investment</a>
+                <button class="rounded-full bg-slate-950 px-6 py-3 font-semibold text-white" type="submit">Save changes</button>
+            {% else %}
+                <button class="rounded-full bg-slate-950 px-6 py-3 font-semibold text-white" type="submit">Create investment</button>
+            {% endif %}
+        </div>
+    </form>
+</section>
+{% endblock %}

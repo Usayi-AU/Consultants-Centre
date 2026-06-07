@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}CRM Tracker | IntelleGo{% endblock %}
+{% block content %}
+<section class="space-y-6">
+    <div class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Client Relations Tracker</p>
+                <h2 class="mt-1 text-2xl font-semibold text-slate-900">{% if show_completed %}Completed items{% else %}Work-in-progress items{% endif %}</h2>
+                <p class="mt-2 text-sm text-slate-600">{% if show_completed %}This view shows completed action items in a table for review.{% else %}This tracker shows active action items in a table for quick navigation and updates.{% endif %}</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+                <p>Latest update: {% if latest_updated_harare %}{{ latest_updated_harare|date:"d M Y H:i" }} (Harare){% else %}No updates yet{% endif %}</p>
+                <a class="rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700" href="{% url 'crm_dashboard' %}">Client Action Items</a>
+                <a class="rounded-full bg-slate-950 px-4 py-2 font-semibold text-white" href="{% url 'crm_client_hub' %}">Client Hub</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-[1.75rem] border border-white/80 bg-white p-5 shadow-panel">
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Total Action Items</p>
+            <p class="mt-3 text-4xl font-semibold text-slate-900">{{ total_items }}</p>
+        </div>
+        <div class="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-5 shadow-panel">
+            <p class="text-xs uppercase tracking-[0.3em] text-amber-700">Pending</p>
+            <p class="mt-3 text-4xl font-semibold text-amber-900">{{ pending_items|length }}</p>
+        </div>
+        <div class="rounded-[1.75rem] border border-teal-200 bg-teal-50 p-5 shadow-panel">
+            <p class="text-xs uppercase tracking-[0.3em] text-teal-700">Ongoing</p>
+            <p class="mt-3 text-4xl font-semibold text-teal-900">{{ ongoing_items|length }}</p>
+        </div>
+        <div class="rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5 shadow-panel">
+            <p class="text-xs uppercase tracking-[0.3em] text-emerald-700">Completed</p>
+            <p class="mt-3 text-2xl font-semibold text-emerald-900">{{ completed_count }}</p>
+        </div>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-3">
+        <aside class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel xl:sticky xl:top-6 h-fit">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Quick Add</p>
+                    <h2 class="mt-1 text-2xl font-semibold text-slate-900">Add WIP item</h2>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">{% if is_crm_admin %}Admin Session{% else %}Owner Session{% endif %}</span>
+            </div>
+            <form method="post" action="{% url 'crm_create_item' %}" class="space-y-4">
+                {% csrf_token %}
+                <div><label class="block text-xs text-slate-600">Client</label>
+                <select name="client_name" class="w-full rounded-2xl border px-3 py-2">
+                    {% for c in all_clients %}
+                        <option value="{{ c }}">{{ c }}</option>
+                    {% endfor %}
+                </select></div>
+                <div><label class="block text-xs text-slate-600">Owner</label><input name="crm_owner" class="w-full rounded-2xl border px-3 py-2" /></div>
+                <div><label class="block text-xs text-slate-600">Action</label><textarea name="action_item" class="w-full rounded-2xl border px-3 py-2"></textarea></div>
+                <button class="w-full rounded-2xl bg-slate-950 px-4 py-3 font-semibold text-white" type="submit">Add WIP Item</button>
+            </form>
+            <p class="mt-4 text-xs text-slate-500">Use this pane to quickly add WIP items; use the Client Hub for full client histories.</p>
+        </aside>
+
+        <main class="col-span-2 space-y-6">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Active action items table</h3>
+                <div class="flex gap-3">
+                    {% if not show_completed %}
+                        <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold" href="{% url 'crm_tracker' %}?show=completed">Open Full Tracker (Completed)</a>
+                    {% else %}
+                        <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold" href="{% url 'crm_tracker' %}">Show WIP Items</a>
+                    {% endif %}
+                    <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href="{% url 'crm_client_hub' %}">Client Hub</a>
+                </div>
+            </div>
+
+            {% if not show_completed %}
+                <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                    <div class="overflow-hidden rounded-3xl border border-slate-200">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                                <thead class="bg-slate-950 text-left text-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-3 font-medium">Client</th>
+                                        <th class="px-4 py-3 font-medium">Owner</th>
+                                        <th class="px-4 py-3 font-medium">Action Item</th>
+                                        <th class="px-4 py-3 font-medium">Update</th>
+                                        <th class="px-4 py-3 font-medium">Due Date</th>
+                                        <th class="px-4 py-3 font-medium">Status</th>
+                                        <th class="px-4 py-3 font-medium">Updated</th>
+                                        <th class="px-4 py-3 font-medium">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    {% for item in active_items %}
+                                        <tr class="align-top">
+                                            <td class="px-4 py-4 font-medium text-slate-900">{{ item.client_name }}</td>
+                                            <td class="px-4 py-4 text-slate-700">{{ item.crm_owner }}</td>
+                                            <td class="px-4 py-4 text-slate-700">{{ item.action_item }}</td>
+                                            <td class="px-4 py-4 text-slate-600">{{ item.progress_update|default:'-' }}</td>
+                                            <td class="px-4 py-4 text-slate-700">{{ item.due_date|default:'-' }}</td>
+                                            <td class="px-4 py-4">
+                                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ item.status_badge_class }}">{{ item.get_status_display }}</span>
+                                            </td>
+                                            <td class="px-4 py-4 text-slate-700">{{ item.updated_at|date:"d M Y H:i" }}</td>
+                                            <td class="px-4 py-4">
+                                                <div class="flex flex-wrap gap-2">
+                                                    <a class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700" href="{% url 'crm_item_history' item.pk %}">History</a>
+                                                    <a class="rounded-full border border-teal-200 px-3 py-1.5 text-xs font-semibold text-teal-700" href="{% url 'crm_edit_item' item.pk %}">Edit</a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td class="px-4 py-8 text-center text-slate-500" colspan="8">No active CRM action items matched the selected filter.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            {% else %}
+                <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                    <div class="overflow-hidden rounded-3xl border border-slate-200">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                                <thead class="bg-slate-950 text-left text-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-3 font-medium">Client</th>
+                                        <th class="px-4 py-3 font-medium">Owner</th>
+                                        <th class="px-4 py-3 font-medium">Action Item</th>
+                                        <th class="px-4 py-3 font-medium">Completion Date</th>
+                                        <th class="px-4 py-3 font-medium">Status</th>
+                                        <th class="px-4 py-3 font-medium">Updated</th>
+                                        <th class="px-4 py-3 font-medium">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    {% for item in active_items %}
+                                        <tr class="align-top">
+                                            <td class="px-4 py-4 font-medium text-slate-900">{{ item.client_name }}</td>
+                                            <td class="px-4 py-4 text-slate-700">{{ item.crm_owner }}</td>
+                                            <td class="px-4 py-4 text-slate-700">{{ item.action_item }}</td>
+                                            <td class="px-4 py-4 text-slate-700">{% if item.due_date %}{{ item.due_date|date:"d M Y" }}{% else %}{{ item.updated_at|date:"d M Y" }}{% endif %}</td>
+                                            <td class="px-4 py-4">
+                                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ item.status_badge_class }}">{{ item.get_status_display }}</span>
+                                            </td>
+                                            <td class="px-4 py-4 text-slate-700">{{ item.updated_at|date:"d M Y H:i" }}</td>
+                                            <td class="px-4 py-4">
+                                                <div class="flex flex-wrap gap-2">
+                                                    <a class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700" href="{% url 'crm_item_history' item.pk %}">History</a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td class="px-4 py-8 text-center text-slate-500" colspan="7">No completed CRM action items matched the selected filter.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            {% endif %}
+        </main>
+    </div>
+</section>
+{% endblock %}

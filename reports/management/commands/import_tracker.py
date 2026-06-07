@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from openpyxl import load_workbook
 
 from reports.models import ClientReport, StatusPhase
+from reports.utils import default_static_workbook
 
 
 def parse_due_date(value):
@@ -34,10 +35,12 @@ class Command(BaseCommand):
         if workbook_path:
             source_path = Path(workbook_path)
         else:
-            xlsx_files = sorted(Path(settings.BASE_DIR).glob("*.xlsx"))
-            if not xlsx_files:
-                raise CommandError("No workbook found in the project root.")
-            source_path = xlsx_files[0]
+            source_path = default_static_workbook("Q1*Report Tracker*.xlsx")
+            if not source_path:
+                xlsx_files = sorted(Path(settings.BASE_DIR).glob("*.xlsx"))
+                if not xlsx_files:
+                    raise CommandError("No operations tracker workbook found in static/ or project root.")
+                source_path = xlsx_files[0]
 
         if not source_path.exists():
             raise CommandError(f"Workbook not found: {source_path}")

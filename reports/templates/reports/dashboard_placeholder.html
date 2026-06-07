@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | IntelleGo{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-4xl rounded-[2rem] border border-white/80 bg-white p-10 shadow-panel text-center">
+    <p class="text-xs uppercase tracking-[0.32em] text-slate-500">Consultancy Module</p>
+    <h2 class="mt-2 text-4xl font-semibold text-slate-900">{{ title }}</h2>
+    <p class="mx-auto mt-4 max-w-2xl text-sm text-slate-600">{{ description }}</p>
+    <a class="mt-8 inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white" href="{% url 'consultancy_hub' %}">Back to Consultancy Hub</a>
+</section>
+{% endblock %}

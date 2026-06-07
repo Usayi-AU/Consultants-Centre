@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}IPS Reviews | IntelleGo{% endblock %}
+{% block content %}
+<section class="space-y-6">
+    <div class="rounded-[2rem] border border-white/80 bg-white p-8 shadow-panel">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <div class="mb-4 flex items-center gap-3">
+                    <img src="/static/img/intellego-logo.png" alt="IntelleGo" class="h-14 w-auto rounded-md bg-white/90 p-1 shadow-sm" onerror="this.style.display='none'">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.32em] text-slate-500">Consultancy Module</p>
+                        <h2 class="mt-2 text-4xl font-semibold text-slate-900">IPS Reviews 2025</h2>
+                    </div>
+                    <p class="mt-3 max-w-3xl text-sm text-slate-600"></p>
+                </div>
+            <div class="flex flex-wrap gap-3">
+                <a class="rounded-full bg-[#1f8ea0] px-4 py-2 text-sm font-semibold text-white" href="{% url 'tenders_list' %}">Tenders, Referrals & Other</a>
+                <a class="rounded-full bg-[#2f5da8] px-4 py-2 text-sm font-semibold text-white" href="{% url 'self_generated_list' %}">Self-Generated Targets</a>
+                <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'business_development_exit' %}">Exit</a>
+            </div>
+        </div>
+    </div>
+
+    <section class="rounded-[2rem] border border-white/80 bg-white p-4 shadow-panel">
+        <div class="grid overflow-hidden rounded-2xl border border-slate-200 text-white md:grid-cols-4">
+            <div class="bg-[#2f5da8] px-4 py-4 text-center">
+                <p class="text-3xl font-bold">{{ dashboard_total_funds }}</p>
+                <p class="text-xs uppercase tracking-[0.08em]">Total Funds</p>
+            </div>
+            <div class="bg-[#1f8ea0] px-4 py-4 text-center">
+                <p class="text-3xl font-bold">{{ dashboard_ips_signed }}</p>
+                <p class="text-xs uppercase tracking-[0.08em]">IPS Signed</p>
+            </div>
+            <div class="bg-[#2f5da8] px-4 py-4 text-center">
+                <p class="text-3xl font-bold">{{ asset_manager_mandates_outstanding }}</p>
+                <p class="text-xs uppercase tracking-[0.08em]">Asset Mgr Mandates Outstanding</p>
+            </div>
+            <div class="bg-[#1f8ea0] px-4 py-4 text-center">
+                <p class="text-3xl font-bold">{{ dashboard_completion_rate }}%</p>
+                <p class="text-xs uppercase tracking-[0.08em]">Completion Rate</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="rounded-[2rem] border border-white/80 bg-white p-4 shadow-panel">
+        <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-900">Documentation Completion Rates</h3>
+                <p class="text-sm text-slate-600">Live workbook summary based on the IPS Reviews sheet.</p>
+            </div>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {% for item in doc_completion %}
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500">{{ item.label }}</p>
+                    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ item.percent }}%</p>
+                    <p class="mt-1 text-sm text-slate-600">{{ item.complete }} / {{ item.total }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="rounded-[2rem] border border-white/80 bg-white p-4 shadow-panel">
+        <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-900">Status Breakdown</h3>
+                <p class="text-sm text-slate-600">A quick look at the current workbook status notes.</p>
+            </div>
+        </div>
+        <div class="grid gap-3 md:grid-cols-3">
+            {% for item in status_breakdown %}
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
+                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500">{{ item.label }}</p>
+                    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ item.count }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="rounded-[2rem] border border-white/80 bg-white p-4 shadow-panel">
+        <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-900">CRM Workload Distribution</h3>
+                <p class="text-sm text-slate-600">Top owners across IC CRM and Admin CRM columns.</p>
+            </div>
+        </div>
+        <div class="grid gap-4 xl:grid-cols-2">
+            <div class="overflow-hidden rounded-2xl border border-slate-200">
+                <table class="min-w-full text-xs md:text-sm">
+                    <thead class="bg-[#1f3763] text-left text-white"><tr><th class="px-3 py-2 font-semibold uppercase">IC CRM</th><th class="px-3 py-2 font-semibold uppercase">Count</th></tr></thead>
+                    <tbody class="divide-y divide-slate-200 bg-white text-slate-800">
+                        {% for item in crm_workload.ic_crm %}
+                            <tr><td class="px-3 py-2">{{ item.label }}</td><td class="px-3 py-2">{{ item.count }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="overflow-hidden rounded-2xl border border-slate-200">
+                <table class="min-w-full text-xs md:text-sm">
+                    <thead class="bg-[#1f3763] text-left text-white"><tr><th class="px-3 py-2 font-semibold uppercase">Admin CRM</th><th class="px-3 py-2 font-semibold uppercase">Count</th></tr></thead>
+                    <tbody class="divide-y divide-slate-200 bg-white text-slate-800">
+                        {% for item in crm_workload.admin_crm %}
+                            <tr><td class="px-3 py-2">{{ item.label }}</td><td class="px-3 py-2">{{ item.count }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="rounded-[2rem] border border-white/80 bg-white p-4 shadow-panel">
+        <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-900">IPS </h3>
+                <p class="text-sm text-slate-600">All IPS funds are listed below.</p>
+            </div>
+            {% if is_bd_admin %}
+                <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href="{% url 'ips_review_add' %}"></a>
+            {% endif %}
+        </div>
+        <div class="overflow-hidden rounded-2xl border border-slate-200">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-900">IPS Reviews Workbook</h3>
+                    
+                </div>
+                {% if is_bd_admin %}
+                    <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href="{% url 'ips_review_add' %}">+ Add IPS Review</a>
+                {% endif %}
+
+            </div>
+            <div class="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div class="flex-1 min-w-[16rem]">
+                    <label for="ips-workbook-search" class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Search Funds</label>
+                    <input id="ips-workbook-search" type="search" placeholder="Type a fund name, CRM owner, admin, or status..." class="w-full rounded-full border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1f3763] focus:ring-2 focus:ring-[#1f3763]/20">
+                </div>
+                <button id="ips-workbook-clear" type="button" class="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">Clear</button>
+            </div>
+            <div class="overflow-hidden rounded-2xl border border-slate-200">
+                <div class="max-h-[72vh] overflow-auto">
+                    <table class="min-w-full text-xs md:text-sm" id="ips-workbook-table">
+                        <thead class="bg-slate-950 text-left text-slate-100">
+                        <tr>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Fund</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">IC CRM</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Administrator</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Admin CRM</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Member Fin. Schedules</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Financial Review</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Replacement Ratios</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Date Data Received</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Date Sent to Client</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Workshop Required</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Asset Mgr Mandates</th>
+                            <th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Status / Comments</th>
+                            {% if is_bd_admin %}<th class="sticky top-0 z-20 bg-slate-950 px-3 py-2 font-semibold uppercase tracking-[0.08em]">Action</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white text-slate-800">
+                        {% for row in ips_rows %}
+                            {% ifchanged row.status_bucket %}
+                                <tr data-status-header="{{ row.status_bucket|lower }}">
+                                    <td colspan="{% if is_bd_admin %}13{% else %}12{% endif %}" class="bg-slate-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-600">
+                                        {{ row.status_bucket }} Records
+                                    </td>
+                                </tr>
+                            {% endifchanged %}
+                            <tr class="align-top odd:bg-white even:bg-slate-50/70 hover:bg-amber-50/60" data-status-row="{{ row.status_bucket|lower }}" data-search="{{ row.fund_name|default:'' }} {{ row.ic_crm|default:'' }} {{ row.administrator|default:'' }} {{ row.admin_crm|default:'' }} {{ row.replacement_ratios|default:'' }} {{ row.date_data_received|default:'' }} {{ row.date_sent_to_client|default:'' }} {{ row.asset_mgr_mandates|default:'' }} {{ row.status_comments|default:'' }}">
+                                <td class="px-3 py-2 font-semibold text-slate-900">{{ row.fund_name }}</td>
+                                <td class="px-3 py-2">{{ row.ic_crm|default:"-" }}</td>
+                                <td class="px-3 py-2">{{ row.administrator|default:"-" }}</td>
+                                <td class="px-3 py-2">{{ row.admin_crm|default:"-" }}</td>
+                                <td class="px-3 py-2 text-center">{% if row.member_fin_schedules %}<span class="font-semibold text-emerald-700">Yes</span>{% else %}<span class="text-slate-500">No</span>{% endif %}</td>
+                                <td class="px-3 py-2 text-center">{% if row.financial_review %}<span class="font-semibold text-emerald-700">Yes</span>{% else %}<span class="text-slate-500">No</span>{% endif %}</td>
+                                <td class="px-3 py-2">{{ row.replacement_ratios|default:"-" }}</td>
+                                <td class="px-3 py-2 whitespace-nowrap">{{ row.date_data_received|default:"-" }}</td>
+                                <td class="px-3 py-2 whitespace-nowrap">{{ row.date_sent_to_client|default:"-" }}</td>
+                                <td class="px-3 py-2 text-center">{% if row.workshop_required %}<span class="font-semibold text-emerald-700">Yes</span>{% else %}<span class="text-slate-500">No</span>{% endif %}</td>
+                                <td class="px-3 py-2">{{ row.asset_mgr_mandates|default:"-" }}</td>
+                                <td class="px-3 py-2">
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {% if 'signed' in row.status_comments|lower %}bg-emerald-100 text-emerald-800{% elif 'draft' in row.status_comments|lower %}bg-amber-100 text-amber-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+                                        {{ row.status_comments|default:"-" }}
+                                    </span>
+                                </td>
+                                {% if is_bd_admin %}
+                                    <td class="px-3 py-2 whitespace-nowrap">
+                                        <a class="font-semibold text-[#1f3763] underline decoration-slate-300 underline-offset-4 hover:decoration-[#1f3763] mr-3" href="{% url 'ips_review_edit' row.pk %}">Edit</a>
+                                        <a class="font-semibold text-rose-600 underline decoration-rose-200 underline-offset-4 hover:decoration-rose-600" href="{% url 'ips_review_delete' row.pk %}">Delete</a>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% empty %}
+                            <tr><td class="px-3 py-8 text-center text-slate-500" colspan="13">No IPS review records available.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</section>
+<script>
+(function () {
+    const searchInput = document.getElementById('ips-workbook-search');
+    const clearButton = document.getElementById('ips-workbook-clear');
+    const rows = Array.from(document.querySelectorAll('#ips-workbook-table tbody tr[data-search]'));
+    const headers = Array.from(document.querySelectorAll('#ips-workbook-table tbody tr[data-status-header]'));
+
+    function applyFilter() {
+        const query = searchInput.value.trim().toLowerCase();
+        const visibleGroups = new Set();
+
+        rows.forEach((row) => {
+            const matches = !query || row.dataset.search.toLowerCase().includes(query);
+            row.style.display = matches ? '' : 'none';
+            if (matches) {
+                visibleGroups.add(row.dataset.statusRow);
+            }
+        });
+
+        headers.forEach((header) => {
+            header.style.display = visibleGroups.has(header.dataset.statusHeader) ? '' : 'none';
+        });
+    }
+
+    searchInput?.addEventListener('input', applyFilter);
+    clearButton?.addEventListener('click', () => {
+        searchInput.value = '';
+        applyFilter();
+        searchInput.focus();
+    });
+})();
+</script>
+{% endblock %}

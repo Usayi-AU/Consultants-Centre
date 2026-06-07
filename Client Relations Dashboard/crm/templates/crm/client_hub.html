@@ -1,0 +1,55 @@
+{% extends 'crm/base.html' %}
+{% block title %}Client Hub | Dashboard{% endblock %}
+{% block content %}
+<div class="rounded-[28px] border border-white/10 bg-white/95 p-6 shadow-soft sm:p-8">
+    <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Client Hub</p>
+            <h2 class="mt-2 text-3xl font-bold text-slate-900">Find every client and their active work</h2>
+            <p class="mt-2 text-slate-600">Search across names, owners, and action items to quickly surface the right client profile.</p>
+        </div>
+        <div class="rounded-2xl bg-slate-950 px-4 py-3 text-white">
+            <p class="text-xs uppercase tracking-[0.2em] text-slate-300">Search focus</p>
+            <p class="mt-2 text-sm text-slate-100">Refine the view with client name, owner, or item details.</p>
+        </div>
+    </div>
+
+    <form method="get" class="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
+        <input name="q" value="{{ q }}" placeholder="Search clients, items or owner" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+        <button type="submit" class="rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800">Search</button>
+        {% if q %}
+            <a href="{% url 'crm:client_hub' %}" class="rounded-xl border border-slate-300 px-5 py-3 text-center font-semibold text-slate-700 transition hover:bg-white">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="mt-8 grid gap-6 xl:grid-cols-2">
+    {% for client, group in clients_items %}
+        <section class="rounded-[24px] border border-white/10 bg-white/95 p-6 shadow-soft">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Client</p>
+                    <h3 class="mt-2 text-2xl font-bold text-slate-900">{{ client }}</h3>
+                    <p class="mt-2 text-sm text-slate-600">Completed: {{ group.completed|length }} • Ongoing: {{ group.ongoing|length }}</p>
+                </div>
+                <a href="{% url 'crm:client_detail' client %}" class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">View profile</a>
+            </div>
+
+            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                <div class="rounded-2xl bg-emerald-50 p-4">
+                    <p class="text-sm text-emerald-700">Completed</p>
+                    <p class="mt-2 text-3xl font-bold text-slate-900">{{ group.completed|length }}</p>
+                </div>
+                <div class="rounded-2xl bg-amber-50 p-4">
+                    <p class="text-sm text-amber-700">Ongoing</p>
+                    <p class="mt-2 text-3xl font-bold text-slate-900">{{ group.ongoing|length }}</p>
+                </div>
+            </div>
+        </section>
+    {% empty %}
+        <div class="rounded-[24px] border border-dashed border-slate-300 bg-white/80 px-4 py-8 text-center text-slate-500 xl:col-span-2">
+            No clients available yet.
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

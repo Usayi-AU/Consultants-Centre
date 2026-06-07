@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Client Relations Dashboard | IntelleGo{% endblock %}
+{% block content %}
+<section class="space-y-6">
+    <div class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Client Relations Summary</p>
+                <h2 class="mt-1 text-2xl font-semibold text-slate-900">Landing dashboard overview</h2>
+                <p class="mt-2 text-sm text-slate-600">Use the button below to open the tracker. This page focuses on active action items only.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+                <p>Latest update: {% if latest_updated_harare %}{{ latest_updated_harare|date:"d M Y H:i" }} (Harare){% else %}No updates yet{% endif %}</p>
+                <a class="rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950" href="{% url 'crm_tracker' %}">Open Tracker</a>
+                <a class="rounded-full bg-slate-950 px-4 py-2 font-semibold text-white transition hover:bg-slate-800" href="{% url 'crm_client_hub' %}">Client Hub</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div class="rounded-[1.75rem] border border-white/80 bg-white p-5 shadow-panel">
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Total Action Items</p>
+            <p class="mt-3 text-4xl font-semibold text-slate-900">{{ total_items }}</p>
+        </div>
+        <div class="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-5 shadow-panel">
+            <p class="text-xs uppercase tracking-[0.3em] text-amber-700">Pending</p>
+            <p class="mt-3 text-4xl font-semibold text-amber-900">{{ pending_count }}</p>
+        </div>
+        <div class="rounded-[1.75rem] border border-teal-200 bg-teal-50 p-5 shadow-panel">
+            <p class="text-xs uppercase tracking-[0.3em] text-teal-700">Ongoing</p>
+            <p class="mt-3 text-4xl font-semibold text-teal-900">{{ ongoing_count }}</p>
+        </div>
+        <div class="rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5 shadow-panel">
+            <p class="text-xs uppercase tracking-[0.3em] text-emerald-700">Completed</p>
+            <p class="mt-3 text-4xl font-semibold text-emerald-900">{{ completed_count }}</p>
+        </div>
+        <div class="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 shadow-panel">
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-600">Work in Progress</p>
+            <p class="mt-3 text-4xl font-semibold text-slate-900">{{ in_progress_count }}</p>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-white/80 bg-white p-4 shadow-panel">
+            <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Quick Action</p>
+                <h3 class="mt-1 text-xl font-semibold text-slate-900">Add action item</h3>
+            </div>
+            <a class="inline-flex items-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800" href="#add-action-item">Add action item</a>
+        </div>
+
+        <main class="space-y-6">
+            <section id="client-action-items" class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Client Relations Action Items</p>
+                        <h2 class="mt-1 text-2xl font-semibold text-slate-900">Active action items</h2>
+                        <p class="mt-2 text-sm text-slate-600">This table shows only WIP items. Use the tracker button to switch to the full tracker when needed.</p>
+                    </div>
+                    <form method="get" class="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+                        <input class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500" type="text" name="q" value="{{ search_query }}" placeholder="Search by client/owner/text">
+                        <select class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500" name="client">
+                            <option value="">All clients</option>
+                            {% for client in all_clients %}
+                                <option value="{{ client }}" {% if client_filter == client %}selected{% endif %}>{{ client }}</option>
+                            {% endfor %}
+                        </select>
+                        <select class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500" name="status">
+                            {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="rounded-2xl bg-slate-950 px-5 py-3 font-semibold text-white" type="submit">Filter</button>
+                    </form>
+                </div>
+            </section>
+
+            <section class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Active Items</p>
+                        <h3 class="mt-1 text-2xl font-semibold text-slate-900">Easy-to-navigate active action items</h3>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950" href="{% url 'crm_tracker' %}">Open Tracker</a>
+                        <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950" href="{% url 'crm_tracker' %}?show=completed">Full Tracker</a>
+                    </div>
+                </div>
+
+                <div class="overflow-hidden rounded-3xl border border-slate-200">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-950 text-left text-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 font-medium">Client</th>
+                                    <th class="px-4 py-3 font-medium">CRM Owner</th>
+                                    <th class="px-4 py-3 font-medium">Action Item</th>
+                                    <th class="px-4 py-3 font-medium">Update</th>
+                                    <th class="px-4 py-3 font-medium">Due Date</th>
+                                    <th class="px-4 py-3 font-medium">Progress</th>
+                                    <th class="px-4 py-3 font-medium">Last Updated</th>
+                                    <th class="px-4 py-3 font-medium">Actions</th>
+                                    {% if is_crm_admin %}
+                                        <th class="px-4 py-3 font-medium">Admin Actions</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                {% for item in active_items %}
+                                    <tr class="align-top">
+                                        <td class="px-4 py-4 font-medium text-slate-900">{{ item.client_name }}</td>
+                                        <td class="px-4 py-4 text-slate-700">{{ item.crm_owner }}</td>
+                                        <td class="px-4 py-4 text-slate-700">{{ item.action_item }}</td>
+                                        <td class="px-4 py-4 text-slate-600">{{ item.progress_update|default:'-' }}</td>
+                                        <td class="px-4 py-4 text-slate-700">{{ item.due_date|default:'-' }}</td>
+                                        <td class="px-4 py-4">
+                                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ item.status_badge_class }}">{{ item.get_status_display }}</span>
+                                        </td>
+                                        <td class="px-4 py-4 text-slate-700">{{ item.updated_at|date:"d M Y H:i" }}</td>
+                                        <td class="px-4 py-4">
+                                            <div class="flex flex-wrap gap-2">
+                                                <a class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700" href="{% url 'crm_item_history' item.pk %}">History</a>
+                                                {% if is_crm_admin or item.status == 'in_progress' %}
+                                                    <a class="rounded-full border border-teal-200 px-3 py-1.5 text-xs font-semibold text-teal-700" href="{% url 'crm_edit_item' item.pk %}">Edit</a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        {% if is_crm_admin %}
+                                            <td class="px-4 py-4">
+                                                <div class="flex flex-wrap gap-2">
+                                                    <form method="post" action="{% url 'crm_clear_item' item.pk %}">
+                                                        {% csrf_token %}
+                                                        <button class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700" type="submit">Clear</button>
+                                                    </form>
+                                                    <form method="post" action="{% url 'crm_delete_item' item.pk %}" onsubmit="return confirm('Delete this action item?');">
+                                                        {% csrf_token %}
+                                                        <button class="rounded-full border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700" type="submit">Delete</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td class="px-4 py-8 text-center text-slate-500" colspan="{% if is_crm_admin %}9{% else %}8{% endif %}">No active CRM action items matched the selected filter.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="add-action-item" class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Add Action Item</p>
+                        <h3 class="mt-1 text-2xl font-semibold text-slate-900">Create a CRM update</h3>
+                    </div>
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">{% if is_crm_admin %}Admin Session{% else %}Owner Session{% endif %}</span>
+                </div>
+                <form method="post" action="{% url 'crm_create_item' %}" class="grid gap-4 md:grid-cols-2">
+                    {% csrf_token %}
+                    <div>{{ create_form.client_name.label_tag }}{{ create_form.client_name }}</div>
+                    <div>{{ create_form.crm_owner.label_tag }}{{ create_form.crm_owner }}</div>
+                    <div class="md:col-span-2">{{ create_form.action_item.label_tag }}{{ create_form.action_item }}</div>
+                    <div class="md:col-span-2">{{ create_form.progress_update.label_tag }}{{ create_form.progress_update }}</div>
+                    <div>{{ create_form.due_date.label_tag }}{{ create_form.due_date }}</div>
+                    <div class="flex items-end">
+                        <button class="w-full rounded-2xl bg-slate-950 px-4 py-3 font-semibold text-white" type="submit">Save Update</button>
+                    </div>
+                </form>
+                <p class="mt-4 text-xs text-slate-500">CRM owners can add new WIP items. Admins keep full control for edit, delete, and clear actions.</p>
+            </section>
+        </main>
+    </div>
+</section>
+{% endblock %}
