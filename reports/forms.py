@@ -1,7 +1,17 @@
 from django import forms
 
-from .models import AlternativeInvestmentItem, AltInvestmentStatus, CRMActionItem, CRMActionStatus, ClientReport, StatusPhase
-from .models import IPSReviewEntry, TenderReferralEntry, SelfGeneratedTarget
+from .models import (
+    AlternativeInvestmentItem,
+    AltInvestmentStatus,
+    CRMActionItem,
+    CRMActionStatus,
+    ClientReport,
+    IPSReviewEntry,
+    SharePointTrackerEntry,
+    SelfGeneratedTarget,
+    StatusPhase,
+    TenderReferralEntry,
+)
 
 
 class ReportStatusForm(forms.ModelForm):
@@ -28,6 +38,19 @@ class ReportStatusForm(forms.ModelForm):
         if status_phase not in StatusPhase.values:
             raise forms.ValidationError("Select a valid status phase.")
         return status_phase
+
+
+class SharePointTrackerEntryForm(forms.ModelForm):
+    class Meta:
+        model = SharePointTrackerEntry
+        fields = ["client_name", "crm_name", "alternate_name", "word_submitted", "excel_submitted", "pdf_submitted", "due_date", "notes"]
+        widgets = {
+            "client_name": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "crm_name": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "alternate_name": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "due_date": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "notes": forms.Textarea(attrs={"rows": 3, "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+        }
 
 
 class CRMActionItemCreateForm(forms.ModelForm):

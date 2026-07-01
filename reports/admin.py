@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AlternativeInvestmentItem, CRMActionHistory, CRMActionItem, ClientReport
+from .models import AlternativeInvestmentItem, CRMActionHistory, CRMActionItem, ClientReport, SharePointTrackerEntry
 
 
 @admin.register(ClientReport)
@@ -19,6 +19,23 @@ class ClientReportAdmin(admin.ModelAdmin):
     search_fields = ("client_name", "crm_name", "operations_assignee")
     ordering = ("operations_assignee", "crm_name", "client_name")
     list_editable = ("status_phase",)
+
+
+@admin.register(SharePointTrackerEntry)
+class SharePointTrackerEntryAdmin(admin.ModelAdmin):
+    list_display = (
+        "client_name",
+        "crm_name",
+        "alternate_name",
+        "word_submitted",
+        "excel_submitted",
+        "pdf_submitted",
+        "status",
+        "due_date",
+    )
+    list_filter = ("status", "word_submitted", "excel_submitted", "pdf_submitted")
+    search_fields = ("client_name", "crm_name", "alternate_name")
+    list_editable = ("word_submitted", "excel_submitted", "pdf_submitted", "status")
 
 
 @admin.register(CRMActionItem)

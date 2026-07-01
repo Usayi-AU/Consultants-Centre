@@ -78,9 +78,10 @@
                             <button class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" type="submit">Exit BD</button>
                         </form>
                     {% endif %}
-                {% elif request.path|slice:":11" == "/dashboard/" or request.path == "/dashboard" or request.path == "/tracker/" or request.path|slice:":12" == "/operations/" or request.path == "/unlock/" %}
+                {% elif request.path|slice:":11" == "/dashboard/" or request.path == "/dashboard" or request.path == "/tracker/" or request.path|slice:":17" == "/sharepoint-tracker/" or request.path|slice:":12" == "/operations/" or request.path == "/unlock/" %}
                     {% if request.session.access_key %}
                         <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'dashboard' %}">Operations</a>
+                        <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'sharepoint_tracker' %}">SharePoint Tracker</a>
                         {% if request.session.access_level == 'admin' %}
                             <a class="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900" href="{% url 'operations_staff' %}">By Operations</a>
                         {% endif %}

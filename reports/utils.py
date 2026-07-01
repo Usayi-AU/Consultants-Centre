@@ -21,11 +21,13 @@ def build_summary():
     submitted = reports.filter(status_phase=StatusPhase.SUBMITTED).count()
     reviewed = reports.filter(status_phase=StatusPhase.REVIEWED).count()
     sent = reports.filter(status_phase=StatusPhase.SENT_TO_CLIENT).count()
+    pending = total - submitted - reviewed - sent
     return {
         "total_clients": total,
         "submitted_count": submitted,
         "reviewed_count": reviewed,
         "sent_count": sent,
+        "pending_count": pending,
         "outstanding_count": total - sent,
         "completion_rate": percent(sent, total),
     }

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}SharePoint Tracker | Operations Reporting Dashboard{% endblock %}
+{% block content %}
+<section class="space-y-6">
+    <div class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">SharePoint Tracker</p>
+                <h2 class="mt-1 text-3xl font-semibold text-slate-900">Q1 2026 tracker</h2>
+                <p class="mt-2 text-sm text-slate-600">Admins can edit every row, and team users can view the latest tracker data.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950" href="{% url 'dashboard' %}">Back to Operations</a>
+                <form method="get" class="w-full max-w-xl">
+                    <input class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500" type="text" name="q" placeholder="Search client, CRM, or alternate" value="{{ search_query }}">
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-panel">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-950 text-left text-slate-100">
+                    <tr>
+                        <th class="px-4 py-4 font-medium">Client</th>
+                        <th class="px-4 py-4 font-medium">CRM</th>
+                        <th class="px-4 py-4 font-medium">Alternate</th>
+                        <th class="px-4 py-4 font-medium">Word</th>
+                        <th class="px-4 py-4 font-medium">Excel</th>
+                        <th class="px-4 py-4 font-medium">PDF</th>
+                        <th class="px-4 py-4 font-medium">Due</th>
+                        <th class="px-4 py-4 font-medium">Status</th>
+                        <th class="px-4 py-4 font-medium">Notes</th>
+                        {% if show_edit_actions %}<th class="px-4 py-4 font-medium">Action</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                    {% for entry in entries %}
+                        <tr class="align-top">
+                            <td class="px-4 py-4 font-medium text-slate-900">{{ entry.client_name }}</td>
+                            <td class="px-4 py-4 text-slate-700">{{ entry.crm_name|default:"-" }}</td>
+                            <td class="px-4 py-4 text-slate-700">{{ entry.alternate_name|default:"-" }}</td>
+                            <td class="px-4 py-4 text-slate-700">{% if entry.word_submitted %}✓{% endif %}</td>
+                            <td class="px-4 py-4 text-slate-700">{% if entry.excel_submitted %}✓{% endif %}</td>
+                            <td class="px-4 py-4 text-slate-700">{% if entry.pdf_submitted %}✓{% endif %}</td>
+                            <td class="px-4 py-4 text-slate-700">{{ entry.due_date|default:"-" }}</td>
+                            <td class="px-4 py-4">
+                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ entry.status_badge_class }}">{{ entry.get_status_display }}</span>
+                            </td>
+                            <td class="px-4 py-4 text-slate-600">{{ entry.notes|default:"-" }}</td>
+                            {% if show_edit_actions %}
+                                <td class="px-4 py-4">
+                                    <a class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-950" href="{% url 'edit_sharepoint_entry' entry.pk %}">Edit</a>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td class="px-4 py-8 text-center text-slate-500" colspan="10">No tracker rows matched your search.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}

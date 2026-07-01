@@ -1,16 +1,16 @@
 from datetime import timedelta
 
 from django.contrib import messages
+from django.core.management import call_command
 from django.db.models import Case, Count, IntegerField, Q, Value, When
+from django.db.models.functions import TruncDate
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.db.models.functions import TruncDate
 
-from .forms import AlternativeInvestmentItemForm, ReportStatusForm
-from .forms import DashboardSettingsForm
-from django.http import JsonResponse
-from .models import AlternativeInvestmentItem, AltInvestmentStatus, ClientReport
+from .forms import AlternativeInvestmentItemForm, DashboardSettingsForm, ReportStatusForm, SharePointTrackerEntryForm
+from .models import AlternativeInvestmentItem, AltInvestmentStatus, ClientReport, IPSReviewEntry, SelfGeneratedTarget, SharePointTrackerEntry, TenderReferralEntry
 from .permissions import (
     ADMIN_ACCESS_KEY,
     ALT_ADMIN_ACCESS_KEY,
@@ -124,7 +124,7 @@ def dashboard(request):
     operations_rows = build_grouped_progress("operations_assignee")
     chart_data = {
         "summary": {
-            "pending": summary["total_clients"] - summary["submitted_count"],
+            "pending": summary["pending_count"],
             "submitted": summary["submitted_count"],
             "reviewed": summary["reviewed_count"],
             "sent": summary["sent_count"],
@@ -208,6 +208,48 @@ def edit_report(request, pk):
         form = ReportStatusForm(instance=report)
 
     return render(request, "reports/report_form.html", {"form": form, "report": report})
+
+
+@access_key_required
+def sharepoint_tracker(request):
+    if not SharePointTrackerEntry.objects.exists():
+        call_command("import_sharepoint_tracker")
+
+    search_query = request.GET.get("q", "").strip()
+    entries = SharePointTrackerEntry.objects.all()
+    if search_query:
+        entries = entries.filter(
+            Q(client_name__icontains=search_query)
+            | Q(crm_name__icontains=search_query)
+            | Q(alternate_name__icontains=search_query)
+            | Q(notes__icontains=search_query)
+        )
+
+    return render(
+        request,
+        "reports/sharepoint_tracker.html",
+        {
+            "entries": entries,
+            "search_query": search_query,
+            "show_edit_actions": is_ops_admin(request),
+        },
+    )
+
+
+@ops_admin_required
+@access_key_required
+def edit_sharepoint_entry(request, pk):
+    entry = get_object_or_404(SharePointTrackerEntry, pk=pk)
+    if request.method == "POST":
+        form = SharePointTrackerEntryForm(request.POST, instance=entry)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Updated {entry.client_name}.")
+            return redirect("sharepoint_tracker")
+    else:
+        form = SharePointTrackerEntryForm(instance=entry)
+
+    return render(request, "reports/sharepoint_entry_form.html", {"form": form, "entry": entry})
 
 
 def alt_investments_unlock(request):

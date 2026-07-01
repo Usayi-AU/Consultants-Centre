@@ -1,6 +1,55 @@
 from django.db import models
 
 
+class SharePointTrackerEntry(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SUBMITTED_WORD = "submitted_word", "Submitted Word"
+        SUBMITTED_WORD_AND_EXCEL = "submitted_word_and_excel", "Submitted Word and Excel"
+        COMPLETED = "completed", "Completed"
+
+    client_name = models.CharField(max_length=255, unique=True)
+    crm_name = models.CharField(max_length=120, blank=True)
+    alternate_name = models.CharField(max_length=120, blank=True)
+    word_submitted = models.BooleanField(default=False)
+    excel_submitted = models.BooleanField(default=False)
+    pdf_submitted = models.BooleanField(default=False)
+    due_date = models.CharField(max_length=64, blank=True)
+    status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["client_name"]
+
+    def __str__(self):
+        return self.client_name
+
+    def sync_status(self):
+        if self.word_submitted and self.excel_submitted and self.pdf_submitted:
+            self.status = self.Status.COMPLETED
+        elif self.word_submitted and self.excel_submitted:
+            self.status = self.Status.SUBMITTED_WORD_AND_EXCEL
+        elif self.word_submitted:
+            self.status = self.Status.SUBMITTED_WORD
+        else:
+            self.status = self.Status.PENDING
+
+    @property
+    def status_badge_class(self):
+        return {
+            self.Status.PENDING: "bg-slate-100 text-slate-700 ring-slate-200",
+            self.Status.SUBMITTED_WORD: "bg-amber-100 text-amber-800 ring-amber-200",
+            self.Status.SUBMITTED_WORD_AND_EXCEL: "bg-sky-100 text-sky-800 ring-sky-200",
+            self.Status.COMPLETED: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+        }.get(self.status, "bg-slate-100 text-slate-700 ring-slate-200")
+
+    def save(self, *args, **kwargs):
+        self.sync_status()
+        super().save(*args, **kwargs)
+
+
 class StatusPhase(models.TextChoices):
     PENDING = "pending", "Pending"
     SUBMITTED = "submitted", "Submitted"

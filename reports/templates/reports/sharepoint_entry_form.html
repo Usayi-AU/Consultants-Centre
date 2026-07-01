@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Edit SharePoint Tracker Row | Operations Reporting Dashboard{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-3xl rounded-[2rem] border border-white/80 bg-white p-8 shadow-panel">
+    <div class="mb-6">
+        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">SharePoint Tracker</p>
+        <h2 class="mt-1 text-3xl font-semibold text-slate-900">Edit {{ entry.client_name }}</h2>
+    </div>
+    <form method="post" class="space-y-5">
+        {% csrf_token %}
+        <div class="grid gap-5 md:grid-cols-2">
+            <div>{{ form.client_name.label_tag }} {{ form.client_name }}</div>
+            <div>{{ form.crm_name.label_tag }} {{ form.crm_name }}</div>
+            <div>{{ form.alternate_name.label_tag }} {{ form.alternate_name }}</div>
+            <div>{{ form.due_date.label_tag }} {{ form.due_date }}</div>
+            <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                {{ form.word_submitted }}
+                <label for="id_word_submitted">Word submitted</label>
+            </div>
+            <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                {{ form.excel_submitted }}
+                <label for="id_excel_submitted">Excel submitted</label>
+            </div>
+            <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                {{ form.pdf_submitted }}
+                <label for="id_pdf_submitted">PDF submitted</label>
+            </div>
+        </div>
+        <div>{{ form.notes.label_tag }} {{ form.notes }}</div>
+        <div class="flex flex-wrap gap-3">
+            <button class="rounded-full bg-slate-950 px-5 py-3 font-semibold text-white" type="submit">Save changes</button>
+            <a class="rounded-full border border-slate-200 px-5 py-3 font-semibold text-slate-700" href="{% url 'sharepoint_tracker' %}">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
