@@ -5,7 +5,11 @@ class SharePointTrackerEntry(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         SUBMITTED_WORD = "submitted_word", "Submitted Word"
+        SUBMITTED_PDF = "submitted_pdf", "Submitted PDF"
+        SUBMITTED_EXCEL = "submitted_excel", "Submitted Excel"
         SUBMITTED_WORD_AND_EXCEL = "submitted_word_and_excel", "Submitted Word and Excel"
+        SUBMITTED_WORD_AND_PDF = "submitted_word_and_pdf", "Submitted Word and PDF"
+        SUBMITTED_EXCEL_AND_PDF = "submitted_excel_and_pdf", "Submitted Excel and PDF"
         COMPLETED = "completed", "Completed"
 
     client_name = models.CharField(max_length=255, unique=True)
@@ -27,12 +31,22 @@ class SharePointTrackerEntry(models.Model):
         return self.client_name
 
     def sync_status(self):
-        if self.word_submitted and self.excel_submitted and self.pdf_submitted:
+        submission_count = sum([self.word_submitted, self.excel_submitted, self.pdf_submitted])
+
+        if submission_count == 3:
             self.status = self.Status.COMPLETED
-        elif self.word_submitted and self.excel_submitted:
+        elif self.word_submitted and self.excel_submitted and not self.pdf_submitted:
             self.status = self.Status.SUBMITTED_WORD_AND_EXCEL
+        elif self.word_submitted and self.pdf_submitted and not self.excel_submitted:
+            self.status = self.Status.SUBMITTED_WORD_AND_PDF
+        elif self.excel_submitted and self.pdf_submitted and not self.word_submitted:
+            self.status = self.Status.SUBMITTED_EXCEL_AND_PDF
         elif self.word_submitted:
             self.status = self.Status.SUBMITTED_WORD
+        elif self.excel_submitted:
+            self.status = self.Status.SUBMITTED_EXCEL
+        elif self.pdf_submitted:
+            self.status = self.Status.SUBMITTED_PDF
         else:
             self.status = self.Status.PENDING
 
@@ -41,7 +55,11 @@ class SharePointTrackerEntry(models.Model):
         return {
             self.Status.PENDING: "bg-slate-100 text-slate-700 ring-slate-200",
             self.Status.SUBMITTED_WORD: "bg-amber-100 text-amber-800 ring-amber-200",
+            self.Status.SUBMITTED_PDF: "bg-amber-100 text-amber-800 ring-amber-200",
+            self.Status.SUBMITTED_EXCEL: "bg-amber-100 text-amber-800 ring-amber-200",
             self.Status.SUBMITTED_WORD_AND_EXCEL: "bg-sky-100 text-sky-800 ring-sky-200",
+            self.Status.SUBMITTED_WORD_AND_PDF: "bg-sky-100 text-sky-800 ring-sky-200",
+            self.Status.SUBMITTED_EXCEL_AND_PDF: "bg-sky-100 text-sky-800 ring-sky-200",
             self.Status.COMPLETED: "bg-emerald-100 text-emerald-800 ring-emerald-200",
         }.get(self.status, "bg-slate-100 text-slate-700 ring-slate-200")
 

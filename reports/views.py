@@ -217,6 +217,10 @@ def sharepoint_tracker(request):
 
     search_query = request.GET.get("q", "").strip()
     entries = SharePointTrackerEntry.objects.all()
+    for entry in entries:
+        entry.sync_status()
+        entry.save(update_fields=["status"])
+
     if search_query:
         entries = entries.filter(
             Q(client_name__icontains=search_query)
@@ -250,6 +254,17 @@ def edit_sharepoint_entry(request, pk):
         form = SharePointTrackerEntryForm(instance=entry)
 
     return render(request, "reports/sharepoint_entry_form.html", {"form": form, "entry": entry})
+
+
+@ops_admin_required
+@access_key_required
+def delete_sharepoint_entry(request, pk):
+    entry = get_object_or_404(SharePointTrackerEntry, pk=pk)
+    if request.method == "POST":
+        entry.delete()
+        messages.success(request, f"Deleted {entry.client_name}.")
+        return redirect("sharepoint_tracker")
+    return redirect("sharepoint_tracker")
 
 
 def alt_investments_unlock(request):

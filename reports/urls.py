@@ -10,6 +10,7 @@ urlpatterns = [
     path("tracker/", views.report_tracker, name="report_tracker"),
     path("sharepoint-tracker/", views.sharepoint_tracker, name="sharepoint_tracker"),
     path("sharepoint-tracker/<int:pk>/edit/", views.edit_sharepoint_entry, name="edit_sharepoint_entry"),
+    path("sharepoint-tracker/<int:pk>/delete/", views.delete_sharepoint_entry, name="delete_sharepoint_entry"),
     path("operations/", views.operations_staff_view, name="operations_staff"),
     path("reports/<int:pk>/edit/", views.edit_report, name="report_edit"),
     path("dashboards/alternative-investments/", views.alt_investments_dashboard, name="alt_investments_dashboard"),
