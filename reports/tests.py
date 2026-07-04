@@ -1,9 +1,31 @@
 from django.test import TestCase
+from django.urls import reverse
 
 from .models import Proposal, SharePointTrackerEntry
+from .permissions import ALT_ADMIN_ACCESS_KEY
 
 
 class ProposalTests(TestCase):
+    def test_proposal_add_saves_without_created_by_for_anonymous_request(self):
+        session = self.client.session
+        session["alt_access_key"] = ALT_ADMIN_ACCESS_KEY
+        session["alt_access_level"] = "admin"
+        session.save()
+
+        response = self.client.post(
+            reverse("proposal_add"),
+            {
+                "date": "2026-01-12",
+                "proposal_name": "Anonymous proposal",
+                "status": "received",
+                "description": "Created from a session-based admin flow without a logged-in user.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        proposal = Proposal.objects.get(proposal_name="Anonymous proposal")
+        self.assertIsNone(proposal.created_by)
+
     def test_status_badge_class_is_styled_for_pending(self):
         proposal = Proposal.objects.create(
             proposal_name="Sample proposal",

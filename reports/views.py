@@ -766,7 +766,9 @@ def proposal_detail(request, pk):
 @alt_admin_required
 def proposal_add(request):
     if request.method == "POST":
-        proposal = Proposal(created_by=request.user)
+        proposal = Proposal()
+        if request.user.is_authenticated:
+            proposal.created_by = request.user
         form = ProposalForm(request.POST, instance=proposal)
         if form.is_valid():
             form.save()
