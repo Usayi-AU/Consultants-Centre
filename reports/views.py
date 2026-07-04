@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 
 from django.contrib import messages
@@ -10,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from .chat_service import ChatService
 from .forms import AlternativeInvestmentItemForm, DashboardSettingsForm, ProposalForm, ReportStatusForm, SharePointTrackerEntryForm
 from .models import (
     AlternativeInvestmentItem,
@@ -21,6 +23,7 @@ from .models import (
     ProposalStatus,
     SelfGeneratedTarget,
     SharePointTrackerEntry,
+    StatusPhase,
     TenderReferralEntry,
 )
 from .permissions import (
@@ -47,6 +50,45 @@ from .utils import (
     status_badge_class,
 )
 from .permissions import BD_ADMIN_ACCESS_KEY, BD_TEAM_ACCESS_KEY, bd_access_key_required, bd_admin_required, is_bd_admin
+
+
+def chat_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST requests are supported."}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON body."}, status=400)
+
+    message = (payload.get("message") or "").strip()
+    if not message:
+        return JsonResponse({"error": "Please enter a message."}, status=400)
+
+    summary = build_summary()
+    sent_clients = list(
+        ClientReport.objects.filter(status_phase=StatusPhase.SENT_TO_CLIENT).values_list("client_name", flat=True)[:10]
+    )
+
+    context = {
+        "dashboard": "Consultancy Centre Operations Dashboard",
+        "dashboard_summary": {
+            "total_reports": summary["total_clients"],
+            "submitted": summary["submitted_count"],
+            "reviewed": summary["reviewed_count"],
+            "sent": summary["sent_count"],
+            "pending": summary["pending_count"],
+        },
+        "sent_report_clients": sent_clients,
+        "projects": list(AlternativeInvestmentItem.objects.values_list("investment_name", flat=True)[:8]),
+        "reports": list(ClientReport.objects.values_list("client_name", flat=True)[:8]),
+        "documents": [doc.document_name or doc.file.name for doc in ProposalDocument.objects.select_related("proposal")[:8]],
+        "proposals": list(Proposal.objects.values_list("proposal_name", flat=True)[:8]),
+    }
+
+    service = ChatService()
+    reply = service.generate(message, context=context)
+    return JsonResponse({"reply": reply, "timestamp": timezone.now().isoformat()})
 
 
 def consultancy_hub(request):
