@@ -1,6 +1,17 @@
 from django.test import TestCase
 
-from .models import SharePointTrackerEntry
+from .models import Proposal, SharePointTrackerEntry
+
+
+class ProposalTests(TestCase):
+    def test_status_badge_class_is_styled_for_pending(self):
+        proposal = Proposal.objects.create(
+            proposal_name="Sample proposal",
+            date="2026-01-12",
+            status="preliminary",
+        )
+
+        self.assertEqual(proposal.status_badge_class, "bg-amber-100 text-amber-800 ring-amber-200")
 
 
 class SharePointTrackerEntryTests(TestCase):

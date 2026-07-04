@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.core.management import call_command
+from django.core.paginator import Paginator
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse
@@ -9,8 +10,19 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import AlternativeInvestmentItemForm, DashboardSettingsForm, ReportStatusForm, SharePointTrackerEntryForm
-from .models import AlternativeInvestmentItem, AltInvestmentStatus, ClientReport, IPSReviewEntry, SelfGeneratedTarget, SharePointTrackerEntry, TenderReferralEntry
+from .forms import AlternativeInvestmentItemForm, DashboardSettingsForm, ProposalForm, ReportStatusForm, SharePointTrackerEntryForm
+from .models import (
+    AlternativeInvestmentItem,
+    AltInvestmentStatus,
+    ClientReport,
+    IPSReviewEntry,
+    Proposal,
+    ProposalDocument,
+    ProposalStatus,
+    SelfGeneratedTarget,
+    SharePointTrackerEntry,
+    TenderReferralEntry,
+)
 from .permissions import (
     ADMIN_ACCESS_KEY,
     ALT_ADMIN_ACCESS_KEY,
@@ -34,7 +46,6 @@ from .utils import (
     split_alt_text_blocks,
     status_badge_class,
 )
-from .models import IPSReviewEntry, TenderReferralEntry, SelfGeneratedTarget
 from .permissions import BD_ADMIN_ACCESS_KEY, BD_TEAM_ACCESS_KEY, bd_access_key_required, bd_admin_required, is_bd_admin
 
 
@@ -690,6 +701,167 @@ def _alt_detail_headline(item):
 
 def _alt_detail_headline_css(item):
     return _alt_preview_headline_css_for_item(item)
+
+
+@alt_access_key_required
+def proposals_list(request):
+    proposals = Proposal.objects.select_related("created_by").all()
+    search_query = request.GET.get("q", "").strip()
+    status_filter = request.GET.get("status", "").strip()
+
+    if search_query:
+        proposals = proposals.filter(
+            Q(proposal_name__icontains=search_query)
+            | Q(description__icontains=search_query)
+            | Q(created_by__username__icontains=search_query)
+        )
+    if status_filter:
+        proposals = proposals.filter(status=status_filter)
+
+    proposals = proposals.order_by("-date", "proposal_name")
+
+    paginator = Paginator(proposals, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        "reports/proposals_list.html",
+        {
+            "page_obj": page_obj,
+            "search_query": search_query,
+            "status_filter": status_filter,
+            "status_choices": [
+                ("", "All status"),
+                (ProposalStatus.RECEIVED, "Received"),
+                (ProposalStatus.PRELIMINARY, "Preliminary analysis done"),
+                (ProposalStatus.UNDER_REVIEW, "Under review"),
+                (ProposalStatus.FINALISED, "Finalised"),
+                (ProposalStatus.APPROVED, "Approved"),
+                (ProposalStatus.DECLINED, "Declined"),
+            ],
+            "is_alt_admin": is_alt_admin(request),
+            "hide_global_nav": True,
+        },
+    )
+
+
+@alt_access_key_required
+def proposal_detail(request, pk):
+    proposal = get_object_or_404(Proposal, pk=pk)
+    documents = proposal.documents.all()
+    return render(
+        request,
+        "reports/proposal_detail.html",
+        {
+            "proposal": proposal,
+            "documents": documents,
+            "is_alt_admin": is_alt_admin(request),
+            "hide_global_nav": True,
+        },
+    )
+
+
+@alt_access_key_required
+@alt_admin_required
+def proposal_add(request):
+    if request.method == "POST":
+        proposal = Proposal(created_by=request.user)
+        form = ProposalForm(request.POST, instance=proposal)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Proposal added successfully.")
+            return redirect("proposals_list")
+    else:
+        form = ProposalForm()
+
+    return render(
+        request,
+        "reports/proposal_form.html",
+        {
+            "form": form,
+            "page_title": "Add Proposal",
+            "is_alt_admin": True,
+            "hide_global_nav": True,
+        },
+    )
+
+
+@alt_access_key_required
+@alt_admin_required
+def proposal_edit(request, pk):
+    proposal = get_object_or_404(Proposal, pk=pk)
+    if request.method == "POST":
+        form = ProposalForm(request.POST, instance=proposal)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Proposal updated successfully.")
+            return redirect("proposal_detail", pk=proposal.pk)
+    else:
+        form = ProposalForm(instance=proposal)
+
+    return render(
+        request,
+        "reports/proposal_form.html",
+        {
+            "form": form,
+            "page_title": "Edit Proposal",
+            "proposal": proposal,
+            "is_alt_admin": True,
+            "hide_global_nav": True,
+        },
+    )
+
+
+@alt_access_key_required
+@alt_admin_required
+def proposal_delete(request, pk):
+    proposal = get_object_or_404(Proposal, pk=pk)
+    if request.method == "POST":
+        proposal.delete()
+        messages.success(request, "Proposal deleted successfully.")
+        return redirect("proposals_list")
+    return render(
+        request,
+        "reports/proposal_confirm_delete.html",
+        {"proposal": proposal, "is_alt_admin": True, "hide_global_nav": True},
+    )
+
+
+@alt_access_key_required
+@alt_admin_required
+def proposal_document_upload(request, pk):
+    proposal = get_object_or_404(Proposal, pk=pk)
+    if request.method == "POST":
+        files = request.FILES.getlist("files")
+        if not files:
+            messages.error(request, "No documents were selected.")
+            return redirect("proposal_detail", pk=proposal.pk)
+        for uploaded_file in files:
+            ProposalDocument.objects.create(
+                proposal=proposal,
+                file=uploaded_file,
+                document_name=uploaded_file.name,
+            )
+        messages.success(request, f"{len(files)} document(s) uploaded successfully.")
+        return redirect("proposal_detail", pk=proposal.pk)
+    return redirect("proposal_detail", pk=proposal.pk)
+
+
+@alt_access_key_required
+@alt_admin_required
+def proposal_document_delete(request, pk):
+    document = get_object_or_404(ProposalDocument, pk=pk)
+    proposal = document.proposal
+    if request.method == "POST":
+        document.delete()
+        messages.success(request, "Document deleted successfully.")
+        return redirect("proposal_detail", pk=proposal.pk)
+    return render(
+        request,
+        "reports/proposal_document_confirm_delete.html",
+        {"document": document, "proposal": proposal, "is_alt_admin": True, "hide_global_nav": True},
+    )
 
 
 @alt_access_key_required

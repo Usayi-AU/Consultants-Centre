@@ -7,6 +7,8 @@ from .models import (
     CRMActionStatus,
     ClientReport,
     IPSReviewEntry,
+    Proposal,
+    ProposalStatus,
     SharePointTrackerEntry,
     SelfGeneratedTarget,
     StatusPhase,
@@ -137,6 +139,24 @@ class CRMActionItemAdminForm(CRMActionItemCreateForm):
         status = self.cleaned_data["status"]
         if status not in CRMActionStatus.values:
             raise forms.ValidationError("Select a valid CRM action status.")
+        return status
+
+
+class ProposalForm(forms.ModelForm):
+    class Meta:
+        model = Proposal
+        fields = ["date", "proposal_name", "status", "description"]
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date", "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "proposal_name": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "status": forms.Select(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "description": forms.Textarea(attrs={"rows": 6, "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+        }
+
+    def clean_status(self):
+        status = self.cleaned_data["status"]
+        if status not in ProposalStatus.values:
+            raise forms.ValidationError("Select a valid proposal status.")
         return status
 
 

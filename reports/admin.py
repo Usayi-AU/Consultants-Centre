@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AlternativeInvestmentItem, CRMActionHistory, CRMActionItem, ClientReport, SharePointTrackerEntry
+from .models import AlternativeInvestmentItem, CRMActionHistory, CRMActionItem, ClientReport, Proposal, ProposalDocument, SharePointTrackerEntry
 
 
 @admin.register(ClientReport)
@@ -52,6 +52,20 @@ class CRMActionHistoryAdmin(admin.ModelAdmin):
     list_filter = ("action_type", "actor_role", "status")
     search_fields = ("client_name", "crm_owner", "action_item_text", "progress_update")
     ordering = ("-created_at",)
+
+
+@admin.register(Proposal)
+class ProposalAdmin(admin.ModelAdmin):
+    list_display = ("proposal_name", "date", "status", "created_by", "updated_at")
+    list_filter = ("status", "created_by")
+    search_fields = ("proposal_name", "description")
+    ordering = ("-date", "proposal_name")
+
+
+@admin.register(ProposalDocument)
+class ProposalDocumentAdmin(admin.ModelAdmin):
+    list_display = ("proposal", "document_name", "file", "uploaded_at")
+    search_fields = ("document_name", "proposal__proposal_name")
 
 
 @admin.register(AlternativeInvestmentItem)

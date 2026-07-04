@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -249,6 +250,71 @@ class AlternativeInvestmentItem(models.Model):
             AltInvestmentStatus.AMBER: "bg-amber-100 text-amber-800",
             AltInvestmentStatus.RED: "bg-rose-100 text-rose-800",
         }.get(self.status_headline_color, "bg-slate-100 text-slate-700")
+
+
+class ProposalStatus(models.TextChoices):
+    RECEIVED = "received", "Received"
+    PRELIMINARY = "preliminary", "Preliminary analysis done"
+    UNDER_REVIEW = "under_review", "Under review"
+    FINALISED = "finalised", "Finalised"
+    APPROVED = "approved", "Approved"
+    DECLINED = "declined", "Declined"
+
+
+class Proposal(models.Model):
+    date = models.DateField()
+    proposal_name = models.CharField(max_length=255)
+    status = models.CharField(max_length=24, choices=ProposalStatus.choices, default=ProposalStatus.RECEIVED)
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_proposals")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date", "proposal_name"]
+
+    def __str__(self):
+        return self.proposal_name
+
+    @property
+    def status_badge_class(self):
+        return {
+            ProposalStatus.RECEIVED: "bg-slate-100 text-slate-700 ring-slate-200",
+            ProposalStatus.PRELIMINARY: "bg-amber-100 text-amber-800 ring-amber-200",
+            ProposalStatus.UNDER_REVIEW: "bg-sky-100 text-sky-800 ring-sky-200",
+            ProposalStatus.FINALISED: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+            ProposalStatus.APPROVED: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+            ProposalStatus.DECLINED: "bg-rose-100 text-rose-800 ring-rose-200",
+        }.get(self.status, "bg-slate-100 text-slate-700 ring-slate-200")
+
+
+class ProposalDocument(models.Model):
+    proposal = models.ForeignKey(Proposal, related_name="documents", on_delete=models.CASCADE)
+    file = models.FileField(upload_to="proposal_documents/%Y/%m/%d/")
+    document_name = models.CharField(max_length=255, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["document_name", "uploaded_at"]
+
+    def __str__(self):
+        return self.document_name or self.file.name
+
+    @property
+    def extension(self):
+        return self.file.name.rsplit(".", 1)[-1].lower() if "." in self.file.name else ""
+
+    @property
+    def is_image(self):
+        return self.extension in {"png", "jpg", "jpeg", "gif", "webp", "bmp"}
+
+    @property
+    def is_pdf(self):
+        return self.extension == "pdf"
+
+    @property
+    def is_office_previewable(self):
+        return self.extension in {"doc", "docx", "xls", "xlsx", "ppt", "pptx"}
 
 
 class DashboardSettings(models.Model):
