@@ -29,5 +29,9 @@ bd_sections.json
 .vscode/
 .idea/
 
+# Local secrets
+.env
+.env.*
+
 # Your nested project (avoid tracking inner git repo)
 Operations Dashboard/

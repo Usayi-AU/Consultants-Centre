@@ -25,6 +25,16 @@
                 </button>
             </div>
         </div>
+        {% if show_quarter_selector %}
+        <div>
+            <label class="mb-2 block text-sm font-medium text-slate-700" for="id_quarter">Quarter</label>
+            <select class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-teal-500" name="quarter" id="id_quarter">
+                {% for option in quarter_options %}
+                <option value="{{ option.value }}" {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
         <button class="w-full rounded-2xl bg-slate-950 px-4 py-3 font-semibold text-white transition hover:bg-slate-800" type="submit">{{ submit_label|default:"Unlock dashboard" }}</button>
     </form>
 </section>

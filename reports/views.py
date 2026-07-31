@@ -1,4 +1,3 @@
-import json
 from datetime import timedelta
 
 from django.contrib import messages
@@ -6,12 +5,10 @@ from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.db.models.functions import TruncDate
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .chat_service import ChatService
 from .forms import AlternativeInvestmentItemForm, DashboardSettingsForm, ProposalForm, ReportStatusForm, SharePointTrackerEntryForm
 from .models import (
     AlternativeInvestmentItem,
@@ -23,7 +20,6 @@ from .models import (
     ProposalStatus,
     SelfGeneratedTarget,
     SharePointTrackerEntry,
-    StatusPhase,
     TenderReferralEntry,
 )
 from .permissions import (
@@ -49,46 +45,39 @@ from .utils import (
     split_alt_text_blocks,
     status_badge_class,
 )
+
+
+QUARTER_OPTIONS = {
+    "q1": "First Quarter",
+    "q2": "Second Quarter",
+    "q3": "Third Quarter",
+}
+
+
+def get_selected_quarter(request):
+    quarter = request.session.get("operations_dashboard_quarter", "q1")
+    return quarter if quarter in QUARTER_OPTIONS else "q1"
+
+
+def get_quarterly_reports(quarter):
+    return list(ClientReport.objects.all())
+
+
+def filter_reports(reports, search_query="", status_filter=""):
+    filtered = reports
+    if search_query:
+        filtered = [
+            report
+            for report in filtered
+            if search_query.lower() in (report.client_name or "").lower()
+            or search_query.lower() in (report.crm_name or "").lower()
+            or search_query.lower() in (report.operations_assignee or "").lower()
+        ]
+    if status_filter:
+        filtered = [report for report in filtered if report.status_phase == status_filter]
+    return filtered
 from .permissions import BD_ADMIN_ACCESS_KEY, BD_TEAM_ACCESS_KEY, bd_access_key_required, bd_admin_required, is_bd_admin
 
-
-def chat_api(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "Only POST requests are supported."}, status=405)
-
-    try:
-        payload = json.loads(request.body.decode("utf-8"))
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON body."}, status=400)
-
-    message = (payload.get("message") or "").strip()
-    if not message:
-        return JsonResponse({"error": "Please enter a message."}, status=400)
-
-    summary = build_summary()
-    sent_clients = list(
-        ClientReport.objects.filter(status_phase=StatusPhase.SENT_TO_CLIENT).values_list("client_name", flat=True)[:10]
-    )
-
-    context = {
-        "dashboard": "Consultancy Centre Operations Dashboard",
-        "dashboard_summary": {
-            "total_reports": summary["total_clients"],
-            "submitted": summary["submitted_count"],
-            "reviewed": summary["reviewed_count"],
-            "sent": summary["sent_count"],
-            "pending": summary["pending_count"],
-        },
-        "sent_report_clients": sent_clients,
-        "projects": list(AlternativeInvestmentItem.objects.values_list("investment_name", flat=True)[:8]),
-        "reports": list(ClientReport.objects.values_list("client_name", flat=True)[:8]),
-        "documents": [doc.document_name or doc.file.name for doc in ProposalDocument.objects.select_related("proposal")[:8]],
-        "proposals": list(Proposal.objects.values_list("proposal_name", flat=True)[:8]),
-    }
-
-    service = ChatService()
-    reply = service.generate(message, context=context)
-    return JsonResponse({"reply": reply, "timestamp": timezone.now().isoformat()})
 
 
 def consultancy_hub(request):
@@ -124,19 +113,24 @@ def consultancy_hub(request):
 def unlock_access(request):
     if request.method == "POST":
         passkey = request.POST.get("passkey", "")
+        quarter = request.POST.get("quarter", "q1")
+        quarter = quarter if quarter in QUARTER_OPTIONS else "q1"
         if passkey == ADMIN_ACCESS_KEY:
             request.session["access_key"] = ADMIN_ACCESS_KEY
             request.session["access_level"] = "admin"
-            messages.success(request, "Admin passkey accepted. Dashboard unlocked.")
+            request.session["operations_dashboard_quarter"] = quarter
+            messages.success(request, f"Admin passkey accepted. {QUARTER_OPTIONS[quarter]} selected.")
             return redirect("dashboard")
         if passkey == TEAM_ACCESS_KEY:
             request.session["access_key"] = TEAM_ACCESS_KEY
             request.session["access_level"] = "team"
-            messages.success(request, "Team passkey accepted. Dashboard unlocked.")
+            request.session["operations_dashboard_quarter"] = quarter
+            messages.success(request, f"Team passkey accepted. {QUARTER_OPTIONS[quarter]} selected.")
             return redirect("dashboard")
         messages.error(request, "Invalid passkey.")
 
     current_level = request.session.get("access_level")
+    selected_quarter = get_selected_quarter(request)
     intro_text = (
         "Operations Admin passkey is required to continue."
         if current_level == "admin"
@@ -151,6 +145,13 @@ def unlock_access(request):
             "intro_text": intro_text,
             "passkey_label": "Operations Passkey",
             "submit_label": "Unlock dashboard",
+            "show_quarter_selector": True,
+            "quarter_options": [
+                {"value": "q1", "label": "First Quarter", "selected": selected_quarter == "q1"},
+                {"value": "q2", "label": "Second Quarter", "selected": selected_quarter == "q2"},
+                {"value": "q3", "label": "Third Quarter", "selected": selected_quarter == "q3"},
+            ],
+            "selected_quarter": selected_quarter,
         },
     )
 
@@ -163,18 +164,14 @@ def exit_access(request):
 
 @access_key_required
 def dashboard(request):
+    selected_quarter = get_selected_quarter(request)
     search_query = request.GET.get("q", "").strip()
-    reports = ClientReport.objects.all()
-    if search_query:
-        reports = reports.filter(
-            Q(client_name__icontains=search_query)
-            | Q(crm_name__icontains=search_query)
-            | Q(operations_assignee__icontains=search_query)
-        )
+    reports = get_quarterly_reports(selected_quarter)
+    reports = filter_reports(reports, search_query=search_query)
 
-    summary = build_summary()
-    crm_rows = build_grouped_progress("crm_name")
-    operations_rows = build_grouped_progress("operations_assignee")
+    summary = build_summary(reports)
+    crm_rows = build_grouped_progress("crm_name", reports)
+    operations_rows = build_grouped_progress("operations_assignee", reports)
     chart_data = {
         "summary": {
             "pending": summary["pending_count"],
@@ -203,23 +200,19 @@ def dashboard(request):
             "show_edit_actions": is_ops_admin(request),
             "status_badge_class": status_badge_class,
             "chart_data": chart_data,
+            "selected_quarter": selected_quarter,
+            "quarter_label": QUARTER_OPTIONS[selected_quarter],
         },
     )
 
 
 @access_key_required
 def report_tracker(request):
+    selected_quarter = get_selected_quarter(request)
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
-    reports = ClientReport.objects.all()
-    if search_query:
-        reports = reports.filter(
-            Q(client_name__icontains=search_query)
-            | Q(crm_name__icontains=search_query)
-            | Q(operations_assignee__icontains=search_query)
-        )
-    if status_filter:
-        reports = reports.filter(status_phase=status_filter)
+    reports = get_quarterly_reports(selected_quarter)
+    reports = filter_reports(reports, search_query=search_query, status_filter=status_filter)
 
     return render(
         request,
@@ -230,6 +223,8 @@ def report_tracker(request):
             "status_filter": status_filter,
             "status_badge_class": status_badge_class,
             "show_edit_actions": is_ops_admin(request),
+            "selected_quarter": selected_quarter,
+            "quarter_label": QUARTER_OPTIONS[selected_quarter],
         },
     )
 
@@ -237,12 +232,16 @@ def report_tracker(request):
 @ops_admin_required
 @access_key_required
 def operations_staff_view(request):
+    selected_quarter = get_selected_quarter(request)
+    reports = get_quarterly_reports(selected_quarter)
     return render(
         request,
         "reports/operations_staff.html",
         {
-            "operations_rows": build_grouped_progress("operations_assignee"),
+            "operations_rows": build_grouped_progress("operations_assignee", reports),
             "status_badge_class": status_badge_class,
+            "selected_quarter": selected_quarter,
+            "quarter_label": QUARTER_OPTIONS[selected_quarter],
         },
     )
 
@@ -265,22 +264,27 @@ def edit_report(request, pk):
 
 @access_key_required
 def sharepoint_tracker(request):
+    selected_quarter = get_selected_quarter(request)
     if not SharePointTrackerEntry.objects.exists():
         call_command("import_sharepoint_tracker")
 
     search_query = request.GET.get("q", "").strip()
-    entries = SharePointTrackerEntry.objects.all()
-    for entry in entries:
-        entry.sync_status()
-        entry.save(update_fields=["status"])
+    entries = list(SharePointTrackerEntry.objects.all())
+
+    if selected_quarter == "q1":
+        for entry in entries:
+            entry.sync_status()
+            entry.save(update_fields=["status"])
 
     if search_query:
-        entries = entries.filter(
-            Q(client_name__icontains=search_query)
-            | Q(crm_name__icontains=search_query)
-            | Q(alternate_name__icontains=search_query)
-            | Q(notes__icontains=search_query)
-        )
+        entries = [
+            entry
+            for entry in entries
+            if search_query.lower() in (entry.client_name or "").lower()
+            or search_query.lower() in (entry.crm_name or "").lower()
+            or search_query.lower() in (entry.alternate_name or "").lower()
+            or search_query.lower() in (entry.notes or "").lower()
+        ]
 
     return render(
         request,
@@ -289,6 +293,8 @@ def sharepoint_tracker(request):
             "entries": entries,
             "search_query": search_query,
             "show_edit_actions": is_ops_admin(request),
+            "selected_quarter": selected_quarter,
+            "quarter_label": QUARTER_OPTIONS[selected_quarter],
         },
     )
 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Consultancy Dashboards{% endblock %}</title>
+    <title>{% block title %}Consultants Centre Dashboards{% endblock %}</title>
     <link rel="icon" type="image/png" href="{% static 'img/intellego-logo.png' %}">
     <link rel="apple-touch-icon" href="{% static 'img/intellego-logo.png' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -105,8 +105,6 @@
         {% endif %}
         {% block content %}{% endblock %}
     </main>
-
-    {% include "reports/chat_widget.html" %}
 
     <footer class="border-t border-white/60 bg-white/70 py-4 backdrop-blur-xl">
         <div class="mx-auto max-w-7xl px-4 text-center text-xs uppercase tracking-[0.22em] text-slate-600 sm:px-6 lg:px-8">

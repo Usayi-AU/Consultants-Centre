@@ -1,60 +1,14 @@
-import json
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
-from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from openpyxl import Workbook
 
-from .chat_service import ChatService
-from .models import Proposal, SharePointTrackerEntry
-from .permissions import ALT_ADMIN_ACCESS_KEY
-
-
-class ChatAssistantTests(TestCase):
-    def test_chat_api_accepts_anonymous_requests(self):
-        response = self.client.post(
-            reverse("chat_api"),
-            data=json.dumps({"message": "Hello"}),
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertIn("reply", payload)
-        self.assertTrue(payload["reply"])
-
-    def test_chat_api_returns_reply_for_authenticated_user(self):
-        user = get_user_model().objects.create_user(username="assistantuser", password="strongpass")
-        self.client.force_login(user)
-
-        response = self.client.post(
-            reverse("chat_api"),
-            data=json.dumps({"message": "What services do you offer?"}),
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertIn("reply", payload)
-        self.assertTrue(payload["reply"])
-
-    def test_build_context_includes_dashboard_counts_for_report_questions(self):
-        service = ChatService()
-        context = {
-            "dashboard_summary": {
-                "total_reports": 12,
-                "submitted": 3,
-                "reviewed": 2,
-                "sent": 5,
-                "pending": 2,
-            },
-            "sent_report_clients": ["Client A", "Client B"],
-        }
-
-        prompt = service.build_context("How many reports were sent to clients?", context)
-
-        self.assertIn("total reports: 12", prompt.lower())
-        self.assertIn("sent to client: 5", prompt.lower())
-        self.assertIn("client a", prompt.lower())
+from .management.commands.import_sharepoint_tracker import Command as ImportSharePointTrackerCommand
+from .models import ClientReport, Proposal, SharePointTrackerEntry, StatusPhase
+from .permissions import ADMIN_ACCESS_KEY, ALT_ADMIN_ACCESS_KEY, TEAM_ACCESS_KEY
 
 
 class ProposalTests(TestCase):
@@ -86,6 +40,167 @@ class ProposalTests(TestCase):
         )
 
         self.assertEqual(proposal.status_badge_class, "bg-amber-100 text-amber-800 ring-amber-200")
+
+
+class DashboardTemplateTests(TestCase):
+    def test_sharepoint_tracker_shows_entries_for_team_second_quarter(self):
+        SharePointTrackerEntry.objects.create(
+            client_name="Client A",
+            crm_name="CRM 1",
+            alternate_name="Alt 1",
+            word_submitted=True,
+            excel_submitted=True,
+            pdf_submitted=True,
+        )
+
+        session = self.client.session
+        session["access_key"] = TEAM_ACCESS_KEY
+        session["access_level"] = "team"
+        session["operations_dashboard_quarter"] = "q2"
+        session.save()
+
+        response = self.client.get(reverse("sharepoint_tracker"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["entries"]), 1)
+
+    def test_sharepoint_tracker_shows_entries_for_admin_second_quarter(self):
+        SharePointTrackerEntry.objects.create(
+            client_name="Client A",
+            crm_name="CRM 1",
+            alternate_name="Alt 1",
+            word_submitted=True,
+            excel_submitted=False,
+            pdf_submitted=False,
+        )
+
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = "q2"
+        session.save()
+
+        response = self.client.get(reverse("sharepoint_tracker"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["entries"]), 1)
+        self.assertEqual(response.context["entries"][0].client_name, "Client A")
+
+    def test_dashboard_does_not_render_outstanding_card(self):
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session.save()
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pending Reports")
+        self.assertNotContains(response, "Outstanding")
+
+    def test_second_quarter_dashboard_keeps_real_status_for_team(self):
+        ClientReport.objects.create(
+            client_name="Client Q2",
+            crm_name="CRM Q2",
+            operations_assignee="Ops Q2",
+            status_phase=StatusPhase.REVIEWED,
+        )
+
+        session = self.client.session
+        session["access_key"] = TEAM_ACCESS_KEY
+        session["access_level"] = "team"
+        session.save()
+
+        response = self.client.post(
+            reverse("unlock_access"),
+            {
+                "passkey": TEAM_ACCESS_KEY,
+                "quarter": "q2",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_quarter"], "q2")
+        self.assertGreaterEqual(response.context["summary"]["total_clients"], 1)
+        self.assertEqual(response.context["summary"]["reviewed_count"], 1)
+
+    def test_second_quarter_dashboard_keeps_real_status_for_admin(self):
+        ClientReport.objects.create(
+            client_name="Client Admin Q2",
+            crm_name="CRM Q2",
+            operations_assignee="Ops Q2",
+            status_phase=StatusPhase.REVIEWED,
+        )
+
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = "q2"
+        session.save()
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_quarter"], "q2")
+        self.assertEqual(response.context["summary"]["reviewed_count"], 1)
+
+    def test_admin_can_update_report_status_in_second_quarter(self):
+        report = ClientReport.objects.create(
+            client_name="Client Edit Q2",
+            crm_name="CRM Q2",
+            operations_assignee="Ops Q2",
+            status_phase=StatusPhase.PENDING,
+        )
+
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = "q2"
+        session.save()
+
+        response = self.client.post(
+            reverse("report_edit", kwargs={"pk": report.pk}),
+            {
+                "due_date": "",
+                "status_phase": StatusPhase.SENT_TO_CLIENT,
+                "notes": "Updated in second quarter",
+            },
+            follow=True,
+        )
+
+        report.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(report.status_phase, StatusPhase.SENT_TO_CLIENT)
+        self.assertEqual(response.context["selected_quarter"], "q2")
+
+
+class SharePointTrackerImportTests(TestCase):
+    def test_import_updates_existing_entries_from_workbook(self):
+        SharePointTrackerEntry.objects.create(client_name="Client A", crm_name="CRM 1")
+
+        with NamedTemporaryFile(suffix=".xlsx", delete=False) as handle:
+            workbook_path = Path(handle.name)
+
+        try:
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.title = "1Q26"
+            sheet.append(["Client Name", "CRM", "Alternate", "Word", "Excel ", "PDF ", "Due Date"])
+            sheet.append([None, None, None, 50, 46, 0, None])
+            sheet.append(["Client A", "CRM 1", "Alt 1", "✓", "✓", "✓", "Dec 2026"])
+            workbook.save(workbook_path)
+
+            command = ImportSharePointTrackerCommand()
+            command.import_from_workbook(workbook_path)
+
+            entry = SharePointTrackerEntry.objects.get(client_name="Client A")
+            self.assertTrue(entry.word_submitted)
+            self.assertTrue(entry.excel_submitted)
+            self.assertTrue(entry.pdf_submitted)
+            self.assertEqual(entry.status, SharePointTrackerEntry.Status.COMPLETED)
+        finally:
+            workbook_path.unlink(missing_ok=True)
 
 
 class SharePointTrackerEntryTests(TestCase):

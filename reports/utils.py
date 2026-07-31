@@ -15,12 +15,19 @@ def percent(done, total):
     return round((done / total) * 100, 1)
 
 
-def build_summary():
-    reports = ClientReport.objects.all()
-    total = reports.count()
-    submitted = reports.filter(status_phase=StatusPhase.SUBMITTED).count()
-    reviewed = reports.filter(status_phase=StatusPhase.REVIEWED).count()
-    sent = reports.filter(status_phase=StatusPhase.SENT_TO_CLIENT).count()
+def build_summary(reports=None):
+    reports = reports if reports is not None else ClientReport.objects.all()
+    if hasattr(reports, "count") and not isinstance(reports, list):
+        total = reports.count()
+        submitted = reports.filter(status_phase=StatusPhase.SUBMITTED).count()
+        reviewed = reports.filter(status_phase=StatusPhase.REVIEWED).count()
+        sent = reports.filter(status_phase=StatusPhase.SENT_TO_CLIENT).count()
+    else:
+        reports_list = list(reports)
+        total = len(reports_list)
+        submitted = sum(1 for report in reports_list if report.status_phase == StatusPhase.SUBMITTED)
+        reviewed = sum(1 for report in reports_list if report.status_phase == StatusPhase.REVIEWED)
+        sent = sum(1 for report in reports_list if report.status_phase == StatusPhase.SENT_TO_CLIENT)
     pending = total - submitted - reviewed - sent
     return {
         "total_clients": total,
@@ -33,10 +40,13 @@ def build_summary():
     }
 
 
-def build_grouped_progress(group_field):
+def build_grouped_progress(group_field, reports=None):
     rows = []
     groups = defaultdict(list)
-    for report in ClientReport.objects.all().order_by(group_field, "client_name"):
+    base_reports = reports if reports is not None else ClientReport.objects.all()
+    if hasattr(base_reports, "order_by"):
+        base_reports = base_reports.order_by(group_field, "client_name")
+    for report in base_reports:
         groups[getattr(report, group_field)].append(report)
 
     for group_name, reports in groups.items():
