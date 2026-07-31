@@ -171,13 +171,13 @@ def unlock_access(request):
             request.session["access_key"] = ADMIN_ACCESS_KEY
             request.session["access_level"] = "admin"
             request.session["operations_dashboard_quarter"] = quarter
-            messages.success(request, f"Admin passkey accepted. {QUARTER_OPTIONS[quarter]} selected.")
+            messages.success(request, f"Admin passkey accepted. You are now in {QUARTER_OPTIONS[quarter]}.")
             return redirect("dashboard")
         if passkey == TEAM_ACCESS_KEY:
             request.session["access_key"] = TEAM_ACCESS_KEY
             request.session["access_level"] = "team"
             request.session["operations_dashboard_quarter"] = quarter
-            messages.success(request, f"Team passkey accepted. {QUARTER_OPTIONS[quarter]} selected.")
+            messages.success(request, f"Team passkey accepted. You are now in {QUARTER_OPTIONS[quarter]}.")
             return redirect("dashboard")
         messages.error(request, "Invalid passkey.")
 

@@ -96,6 +96,20 @@
     </header>
 
     <main class="mx-auto max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        {% if request.session.access_key and request.session.operations_dashboard_quarter %}
+            {% if request.path|slice:":11" == "/dashboard/" or request.path == "/dashboard" or request.path == "/tracker/" or request.path|slice:":17" == "/sharepoint-tracker/" or request.path|slice:":12" == "/operations/" %}
+                <div class="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 shadow-sm">
+                    <span class="font-semibold">Current Quarter:</span>
+                    {% if request.session.operations_dashboard_quarter == 'q1' %}
+                        First Quarter
+                    {% elif request.session.operations_dashboard_quarter == 'q2' %}
+                        Second Quarter
+                    {% elif request.session.operations_dashboard_quarter == 'q3' %}
+                        Third Quarter
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% endif %}
         {% if messages %}
             <div class="mb-6 space-y-3">
                 {% for message in messages %}
