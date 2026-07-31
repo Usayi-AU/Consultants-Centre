@@ -45,6 +45,7 @@ class ProposalTests(TestCase):
 class DashboardTemplateTests(TestCase):
     def test_sharepoint_tracker_shows_entries_for_team_second_quarter(self):
         SharePointTrackerEntry.objects.create(
+            quarter="q1",
             client_name="Client A",
             crm_name="CRM 1",
             alternate_name="Alt 1",
@@ -63,9 +64,12 @@ class DashboardTemplateTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["entries"]), 1)
+        self.assertEqual(response.context["entries"][0].quarter, "q2")
+        self.assertFalse(response.context["entries"][0].word_submitted)
 
     def test_sharepoint_tracker_shows_entries_for_admin_second_quarter(self):
         SharePointTrackerEntry.objects.create(
+            quarter="q1",
             client_name="Client A",
             crm_name="CRM 1",
             alternate_name="Alt 1",
@@ -85,6 +89,7 @@ class DashboardTemplateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["entries"]), 1)
         self.assertEqual(response.context["entries"][0].client_name, "Client A")
+        self.assertEqual(response.context["entries"][0].quarter, "q2")
 
     def test_dashboard_does_not_render_outstanding_card(self):
         session = self.client.session
@@ -100,7 +105,8 @@ class DashboardTemplateTests(TestCase):
 
     def test_second_quarter_dashboard_keeps_real_status_for_team(self):
         ClientReport.objects.create(
-            client_name="Client Q2",
+            quarter="q2",
+            client_name="Client Q2 Team",
             crm_name="CRM Q2",
             operations_assignee="Ops Q2",
             status_phase=StatusPhase.REVIEWED,
@@ -127,6 +133,7 @@ class DashboardTemplateTests(TestCase):
 
     def test_second_quarter_dashboard_keeps_real_status_for_admin(self):
         ClientReport.objects.create(
+            quarter="q2",
             client_name="Client Admin Q2",
             crm_name="CRM Q2",
             operations_assignee="Ops Q2",
@@ -146,7 +153,15 @@ class DashboardTemplateTests(TestCase):
         self.assertEqual(response.context["summary"]["reviewed_count"], 1)
 
     def test_admin_can_update_report_status_in_second_quarter(self):
-        report = ClientReport.objects.create(
+        ClientReport.objects.create(
+            quarter="q1",
+            client_name="Client Edit Q2",
+            crm_name="CRM Q1",
+            operations_assignee="Ops Q1",
+            status_phase=StatusPhase.PENDING,
+        )
+        report_q2 = ClientReport.objects.create(
+            quarter="q2",
             client_name="Client Edit Q2",
             crm_name="CRM Q2",
             operations_assignee="Ops Q2",
@@ -160,7 +175,7 @@ class DashboardTemplateTests(TestCase):
         session.save()
 
         response = self.client.post(
-            reverse("report_edit", kwargs={"pk": report.pk}),
+            reverse("report_edit", kwargs={"pk": report_q2.pk}),
             {
                 "due_date": "",
                 "status_phase": StatusPhase.SENT_TO_CLIENT,
@@ -169,10 +184,61 @@ class DashboardTemplateTests(TestCase):
             follow=True,
         )
 
-        report.refresh_from_db()
+        report_q2.refresh_from_db()
+        report_q1 = ClientReport.objects.get(quarter="q1", client_name="Client Edit Q2")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(report.status_phase, StatusPhase.SENT_TO_CLIENT)
+        self.assertEqual(report_q2.status_phase, StatusPhase.SENT_TO_CLIENT)
+        self.assertEqual(report_q1.status_phase, StatusPhase.PENDING)
         self.assertEqual(response.context["selected_quarter"], "q2")
+
+    def test_admin_sharepoint_update_in_second_quarter_does_not_change_first_quarter(self):
+        SharePointTrackerEntry.objects.create(
+            quarter="q1",
+            client_name="Client S",
+            crm_name="CRM 1",
+            word_submitted=True,
+            excel_submitted=False,
+            pdf_submitted=False,
+        )
+        sharepoint_q2 = SharePointTrackerEntry.objects.create(
+            quarter="q2",
+            client_name="Client S",
+            crm_name="CRM 2",
+            word_submitted=False,
+            excel_submitted=False,
+            pdf_submitted=False,
+        )
+
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = "q2"
+        session.save()
+
+        response = self.client.post(
+            reverse("edit_sharepoint_entry", kwargs={"pk": sharepoint_q2.pk}),
+            {
+                "client_name": "Client S",
+                "crm_name": "CRM 2",
+                "alternate_name": "",
+                "word_submitted": "on",
+                "excel_submitted": "on",
+                "pdf_submitted": "",
+                "due_date": "",
+                "notes": "Updated in q2",
+            },
+            follow=True,
+        )
+
+        sharepoint_q2.refresh_from_db()
+        sharepoint_q1 = SharePointTrackerEntry.objects.get(quarter="q1", client_name="Client S")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(sharepoint_q2.word_submitted)
+        self.assertTrue(sharepoint_q2.excel_submitted)
+        self.assertFalse(sharepoint_q2.pdf_submitted)
+        self.assertTrue(sharepoint_q1.word_submitted)
+        self.assertFalse(sharepoint_q1.excel_submitted)
+        self.assertFalse(sharepoint_q1.pdf_submitted)
 
 
 class SharePointTrackerImportTests(TestCase):
@@ -194,7 +260,7 @@ class SharePointTrackerImportTests(TestCase):
             command = ImportSharePointTrackerCommand()
             command.import_from_workbook(workbook_path)
 
-            entry = SharePointTrackerEntry.objects.get(client_name="Client A")
+            entry = SharePointTrackerEntry.objects.get(quarter="q1", client_name="Client A")
             self.assertTrue(entry.word_submitted)
             self.assertTrue(entry.excel_submitted)
             self.assertTrue(entry.pdf_submitted)

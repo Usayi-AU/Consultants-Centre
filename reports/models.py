@@ -2,6 +2,13 @@ from django.conf import settings
 from django.db import models
 
 
+QUARTER_CHOICES = (
+    ("q1", "First Quarter"),
+    ("q2", "Second Quarter"),
+    ("q3", "Third Quarter"),
+)
+
+
 class SharePointTrackerEntry(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -13,7 +20,8 @@ class SharePointTrackerEntry(models.Model):
         SUBMITTED_EXCEL_AND_PDF = "submitted_excel_and_pdf", "Submitted Excel and PDF"
         COMPLETED = "completed", "Completed"
 
-    client_name = models.CharField(max_length=255, unique=True)
+    quarter = models.CharField(max_length=2, choices=QUARTER_CHOICES, default="q1")
+    client_name = models.CharField(max_length=255)
     crm_name = models.CharField(max_length=120, blank=True)
     alternate_name = models.CharField(max_length=120, blank=True)
     word_submitted = models.BooleanField(default=False)
@@ -27,6 +35,9 @@ class SharePointTrackerEntry(models.Model):
 
     class Meta:
         ordering = ["client_name"]
+        constraints = [
+            models.UniqueConstraint(fields=["quarter", "client_name"], name="unique_sharepoint_client_per_quarter"),
+        ]
 
     def __str__(self):
         return self.client_name
@@ -77,7 +88,8 @@ class StatusPhase(models.TextChoices):
 
 
 class ClientReport(models.Model):
-    client_name = models.CharField(max_length=255, unique=True)
+    quarter = models.CharField(max_length=2, choices=QUARTER_CHOICES, default="q1")
+    client_name = models.CharField(max_length=255)
     crm_name = models.CharField(max_length=120)
     operations_assignee = models.CharField(max_length=120)
     due_date = models.DateField(null=True, blank=True)
@@ -95,6 +107,9 @@ class ClientReport(models.Model):
 
     class Meta:
         ordering = ["operations_assignee", "crm_name", "client_name"]
+        constraints = [
+            models.UniqueConstraint(fields=["quarter", "client_name"], name="unique_report_client_per_quarter"),
+        ]
 
     def __str__(self):
         return self.client_name

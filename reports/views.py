@@ -20,6 +20,7 @@ from .models import (
     ProposalStatus,
     SelfGeneratedTarget,
     SharePointTrackerEntry,
+    StatusPhase,
     TenderReferralEntry,
 )
 from .permissions import (
@@ -60,7 +61,58 @@ def get_selected_quarter(request):
 
 
 def get_quarterly_reports(quarter):
-    return list(ClientReport.objects.all())
+    return list(ClientReport.objects.filter(quarter=quarter))
+
+
+def ensure_quarter_reports(quarter):
+    if quarter == "q1" or ClientReport.objects.filter(quarter=quarter).exists():
+        return
+
+    source_reports = list(ClientReport.objects.filter(quarter="q1"))
+    if not source_reports:
+        return
+
+    ClientReport.objects.bulk_create(
+        [
+            ClientReport(
+                quarter=quarter,
+                client_name=report.client_name,
+                crm_name=report.crm_name,
+                operations_assignee=report.operations_assignee,
+                due_date=report.due_date,
+                status_phase=StatusPhase.PENDING,
+                notes=report.notes,
+            )
+            for report in source_reports
+        ]
+    )
+
+
+def ensure_quarter_sharepoint_entries(quarter):
+    if quarter == "q1" or SharePointTrackerEntry.objects.filter(quarter=quarter).exists():
+        return
+
+    source_entries = list(SharePointTrackerEntry.objects.filter(quarter="q1"))
+    if not source_entries:
+        return
+
+    SharePointTrackerEntry.objects.bulk_create(
+        [
+            SharePointTrackerEntry(
+                quarter=quarter,
+                client_name=entry.client_name,
+                crm_name=entry.crm_name,
+                alternate_name=entry.alternate_name,
+                word_submitted=False,
+                excel_submitted=False,
+                pdf_submitted=False,
+                due_date=entry.due_date,
+                status=SharePointTrackerEntry.Status.PENDING,
+                notes=entry.notes,
+            )
+            for entry in source_entries
+        ]
+    )
 
 
 def filter_reports(reports, search_query="", status_filter=""):
@@ -165,6 +217,7 @@ def exit_access(request):
 @access_key_required
 def dashboard(request):
     selected_quarter = get_selected_quarter(request)
+    ensure_quarter_reports(selected_quarter)
     search_query = request.GET.get("q", "").strip()
     reports = get_quarterly_reports(selected_quarter)
     reports = filter_reports(reports, search_query=search_query)
@@ -209,6 +262,7 @@ def dashboard(request):
 @access_key_required
 def report_tracker(request):
     selected_quarter = get_selected_quarter(request)
+    ensure_quarter_reports(selected_quarter)
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
     reports = get_quarterly_reports(selected_quarter)
@@ -233,6 +287,7 @@ def report_tracker(request):
 @access_key_required
 def operations_staff_view(request):
     selected_quarter = get_selected_quarter(request)
+    ensure_quarter_reports(selected_quarter)
     reports = get_quarterly_reports(selected_quarter)
     return render(
         request,
@@ -249,7 +304,8 @@ def operations_staff_view(request):
 @ops_admin_required
 @access_key_required
 def edit_report(request, pk):
-    report = get_object_or_404(ClientReport, pk=pk)
+    selected_quarter = get_selected_quarter(request)
+    report = get_object_or_404(ClientReport, pk=pk, quarter=selected_quarter)
     if request.method == "POST":
         form = ReportStatusForm(request.POST, instance=report)
         if form.is_valid():
@@ -265,16 +321,16 @@ def edit_report(request, pk):
 @access_key_required
 def sharepoint_tracker(request):
     selected_quarter = get_selected_quarter(request)
-    if not SharePointTrackerEntry.objects.exists():
+    if not SharePointTrackerEntry.objects.filter(quarter="q1").exists():
         call_command("import_sharepoint_tracker")
+    ensure_quarter_sharepoint_entries(selected_quarter)
 
     search_query = request.GET.get("q", "").strip()
-    entries = list(SharePointTrackerEntry.objects.all())
+    entries = list(SharePointTrackerEntry.objects.filter(quarter=selected_quarter))
 
-    if selected_quarter == "q1":
-        for entry in entries:
-            entry.sync_status()
-            entry.save(update_fields=["status"])
+    for entry in entries:
+        entry.sync_status()
+        entry.save(update_fields=["status"])
 
     if search_query:
         entries = [
@@ -302,7 +358,8 @@ def sharepoint_tracker(request):
 @ops_admin_required
 @access_key_required
 def edit_sharepoint_entry(request, pk):
-    entry = get_object_or_404(SharePointTrackerEntry, pk=pk)
+    selected_quarter = get_selected_quarter(request)
+    entry = get_object_or_404(SharePointTrackerEntry, pk=pk, quarter=selected_quarter)
     if request.method == "POST":
         form = SharePointTrackerEntryForm(request.POST, instance=entry)
         if form.is_valid():
@@ -318,7 +375,8 @@ def edit_sharepoint_entry(request, pk):
 @ops_admin_required
 @access_key_required
 def delete_sharepoint_entry(request, pk):
-    entry = get_object_or_404(SharePointTrackerEntry, pk=pk)
+    selected_quarter = get_selected_quarter(request)
+    entry = get_object_or_404(SharePointTrackerEntry, pk=pk, quarter=selected_quarter)
     if request.method == "POST":
         entry.delete()
         messages.success(request, f"Deleted {entry.client_name}.")

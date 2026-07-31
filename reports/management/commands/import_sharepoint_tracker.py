@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import openpyxl
@@ -45,8 +44,10 @@ class Command(BaseCommand):
             notes = ""
 
             entry, created = SharePointTrackerEntry.objects.get_or_create(
+                quarter="q1",
                 client_name=client_name,
                 defaults={
+                    "quarter": "q1",
                     "crm_name": crm_name,
                     "alternate_name": alternate_name,
                     "word_submitted": word_submitted,

@@ -50,7 +50,7 @@ class Command(BaseCommand):
             raise CommandError("The workbook does not contain a 'Report Tracker' sheet.")
 
         worksheet = workbook["Report Tracker"]
-        ClientReport.objects.all().delete()
+        ClientReport.objects.filter(quarter="q1").delete()
 
         rows_created = 0
         for row in worksheet.iter_rows(min_row=5, values_only=True):
@@ -76,6 +76,7 @@ class Command(BaseCommand):
                 status_phase = StatusPhase.PENDING
 
             ClientReport.objects.create(
+                quarter="q1",
                 client_name=str(client_name).strip(),
                 crm_name=str(crm_name).strip(),
                 operations_assignee=str(operations_assignee).strip(),
