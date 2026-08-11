@@ -1,0 +1,92 @@
+{% extends 'crm/base.html' %}
+{% block title %}Meeting Feedback | Client Relations{% endblock %}
+{% block content %}
+<div class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-soft sm:p-8">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <span class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700">Meeting Feedback Hub</span>
+            <h2 class="mt-2 text-3xl font-bold text-slate-900">Client meeting notes &amp; action items</h2>
+            <p class="mt-2 max-w-3xl text-slate-600">Log meeting outcomes and raise action items that sync straight into the Client Relations Dashboard.</p>
+        </div>
+        <a href="{% url 'crm:create_meeting' %}" class="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+            <span>＋</span> Log New Meeting
+        </a>
+    </div>
+
+    <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Total Meetings</p>
+            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ stats.total_meetings }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Open Actions</p>
+            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ stats.open_actions }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Overdue</p>
+            <p class="mt-1 text-2xl font-semibold text-rose-600">{{ stats.overdue_actions }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Due in 7 Days</p>
+            <p class="mt-1 text-2xl font-semibold text-amber-600">{{ stats.due_soon_actions }}</p>
+        </div>
+    </div>
+
+    <form method="get" class="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:flex-row sm:items-center">
+        <input name="q" value="{{ q }}" placeholder="Search by client, attendee, or notes" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-slate-400 focus:outline-none" />
+        <select name="scope" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-slate-400 focus:outline-none">
+            <option value="all" {% if scope == 'all' %}selected{% endif %}>All</option>
+            <option value="open" {% if scope == 'open' %}selected{% endif %}>Open Actions</option>
+            <option value="overdue" {% if scope == 'overdue' %}selected{% endif %}>Overdue</option>
+            <option value="due_soon" {% if scope == 'due_soon' %}selected{% endif %}>Due Soon</option>
+        </select>
+        <button type="submit" class="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800">Apply</button>
+        {% if q %}
+            <a href="{% url 'crm:meetings_list' %}" class="rounded-xl border border-slate-300 px-5 py-3 text-center font-semibold text-slate-700 transition hover:bg-white">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+    {% for meeting in meetings %}
+        <div class="rounded-[24px] border border-slate-200 bg-white p-6 shadow-soft transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-28px_rgba(15,23,42,0.45)]">
+            <a href="{% url 'crm:meeting_detail' meeting.pk %}" class="block">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">{{ meeting.meeting_date|date:'d-M-y' }}</p>
+                        <h3 class="mt-1 text-lg font-semibold text-slate-900">{{ meeting.client }}</h3>
+                    </div>
+                    {% if meeting.open_action_count %}
+                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">{{ meeting.open_action_count }} open</span>
+                    {% else %}
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">All clear</span>
+                    {% endif %}
+                </div>
+                {% if meeting.attendees %}
+                    <p class="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400">Attendees</p>
+                    <p class="text-sm text-slate-600">{{ meeting.attendees }}</p>
+                {% endif %}
+                {% if meeting.summary %}
+                    <p class="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{{ meeting.summary }}</p>
+                {% endif %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <p class="text-xs font-medium text-slate-400">Logged by {{ meeting.logged_by|default:"—" }}</p>
+                    <span class="text-xs font-semibold text-slate-500">View details →</span>
+                </div>
+            </a>
+            {% if access_state.role == 'admin' %}
+                <div class="mt-4 border-t border-slate-100 pt-3 text-right">
+                    <a href="{% url 'crm:delete_meeting' meeting.pk %}" class="text-xs font-semibold text-red-600 hover:text-red-800">Delete</a>
+                </div>
+            {% endif %}
+        </div>
+    {% empty %}
+        <div class="col-span-full rounded-[24px] border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white p-10 text-center text-slate-500">
+            <div class="mx-auto mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">M</div>
+            <p class="text-base font-medium text-slate-700">No meeting feedback logged yet.</p>
+            <p class="mt-2">Click <span class="font-semibold text-indigo-600">Log New Meeting</span> to capture your first client update.</p>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+

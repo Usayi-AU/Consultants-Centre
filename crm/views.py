@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import timedelta
 from functools import wraps
 
 from django.contrib import messages
@@ -10,12 +11,18 @@ from django.db.models import Q
 
 from .forms import ActionItemForm
 from .models import ActionItem, ActionItemHistory, SummaryMetric, STATUS_DONE
+from .forms import MeetingLogForm, MeetingActionPointForm
+from .models import MeetingLog, MeetingActionPoint, MeetingFeedbackSeenState
 from reports.trail import build_change_details, log_dashboard_event
 
 
 ACCESS_SESSION_KEY = 'crm_access'
 GENERAL_PASSKEY = '02'
 ADMIN_PASSKEY = 'tari.crm@'
+OWNER_NAMES = [
+    'Isaac', 'Welcome', 'IsaacGT', 'Tino', 'Godfrey',
+    'Arnold', 'Tatenda', 'Eustina', 'Elvis', 'Tari', 'Owen', 'Simba',
+]
 
 
 def normalize_access_value(value):
@@ -23,11 +30,56 @@ def normalize_access_value(value):
 
 
 def get_owner_lookup():
+    lookup = {normalize_access_value(name): name for name in OWNER_NAMES}
     owners = ActionItem.objects.exclude(owner__isnull=True).exclude(owner='').values_list('owner', flat=True).distinct()
-    lookup = {}
     for owner in owners:
-        lookup[normalize_access_value(owner)] = owner
+        lookup.setdefault(normalize_access_value(owner), owner)
     return lookup
+
+
+def can_manage_meetings(access):
+    return access['role'] in ('admin', 'owner')
+
+
+def get_meetings_viewer_name(access):
+    if access['role'] == 'owner' and access.get('owner'):
+        return access['owner']
+    if access['role'] == 'admin':
+        return 'Admin'
+    return None
+
+
+def get_meeting_unseen_count_for_access(access):
+    viewer_name = get_meetings_viewer_name(access)
+    if not viewer_name:
+        return 0
+
+    state, _ = MeetingFeedbackSeenState.objects.get_or_create(viewer_name=viewer_name)
+    meetings = MeetingLog.objects.all()
+    if state.last_seen_at:
+        meetings = meetings.filter(
+            Q(created_at__gt=state.last_seen_at)
+            | Q(created_at=state.last_seen_at, pk__gt=state.last_seen_meeting_pk)
+        )
+    return meetings.count()
+
+
+def mark_meetings_seen_for_access(access):
+    viewer_name = get_meetings_viewer_name(access)
+    if not viewer_name:
+        return
+
+    relevant_meetings = MeetingLog.objects.all().order_by('-created_at', '-pk')
+
+    latest = relevant_meetings.first()
+    state, _ = MeetingFeedbackSeenState.objects.get_or_create(viewer_name=viewer_name)
+    if latest:
+        state.last_seen_at = latest.created_at
+        state.last_seen_meeting_pk = latest.pk
+    else:
+        state.last_seen_at = timezone.now()
+        state.last_seen_meeting_pk = 0
+    state.save(update_fields=['last_seen_at', 'last_seen_meeting_pk'])
 
 
 def get_crm_access(request):
@@ -168,6 +220,29 @@ def unlock_access(request):
     return render(request, 'crm/unlock_access.html', {'access_state': access})
 
 
+def meetings_unlock(request):
+    access = get_crm_access(request)
+    if can_manage_meetings(access):
+        return redirect('crm:meetings_list')
+
+    if request.method == 'POST':
+        result = resolve_passkey(request.POST.get('passkey'))
+        if result and result['role'] in {'admin', 'owner'}:
+            set_crm_access(request, result['role'], result.get('owner'))
+            mark_meetings_seen_for_access({'role': result['role'], 'owner': result.get('owner')})
+            messages.success(request, f"{result['message']} Meeting Feedback access granted.")
+            return redirect('crm:meetings_list')
+
+        if result and result['role'] == 'general':
+            messages.error(request, 'General passkey cannot access Meeting Feedback. Use your named passkey or admin passkey.')
+        else:
+            messages.error(request, 'Invalid passkey for Meeting Feedback.')
+
+    return render(request, 'crm/meetings_unlock.html', {
+        'access_state': access,
+    })
+
+
 def exit_dashboard(request):
     if request.method in ('GET', 'POST'):
         request.session.pop(ACCESS_SESSION_KEY, None)
@@ -188,6 +263,22 @@ def dashboard(request):
     summary_metrics = SummaryMetric.objects.all()
     active_items = qs.exclude(status__iexact=STATUS_DONE)
     completed_items = qs.filter(status__iexact=STATUS_DONE)
+    today = timezone.localdate()
+
+    meeting_preview = []
+    meetings_total = 0
+    meetings_open_actions = 0
+    meetings_due_soon = 0
+
+    if can_manage_meetings(access):
+        meeting_preview = list(MeetingLog.objects.order_by('-meeting_date', '-created_at')[:3])
+        meetings_total = MeetingLog.objects.count()
+        open_actions = MeetingActionPoint.objects.exclude(status__iexact=STATUS_DONE)
+        meetings_open_actions = open_actions.count()
+        meetings_due_soon = open_actions.filter(
+            target_date__gte=today,
+            target_date__lte=today + timedelta(days=7),
+        ).count()
 
     recent_updates = []
     if access['role'] == 'admin':
@@ -197,6 +288,11 @@ def dashboard(request):
         'summary_metrics': summary_metrics,
         'active_items_count': active_items.count(),
         'completed_items_count': completed_items.count(),
+        'meetings_unseen_count': get_meeting_unseen_count_for_access(access),
+        'meetings_total': meetings_total,
+        'meetings_open_actions': meetings_open_actions,
+        'meetings_due_soon': meetings_due_soon,
+        'meeting_preview': meeting_preview,
         'recent_updates': recent_updates,
         'access_state': access,
     }
@@ -384,5 +480,187 @@ def delete_history(request, pk):
 
     return render(request, 'crm/history_confirm_delete.html', {
         'history_entry': history_entry,
+        'access_state': access,
+    })
+
+
+def get_filtered_meetings(request):
+    return MeetingLog.objects.all()
+
+
+@crm_access_required
+def meetings_list(request):
+    access = get_crm_access(request)
+    if not can_manage_meetings(access):
+        messages.info(request, 'Please unlock Meeting Feedback using your named passkey or admin passkey.')
+        return redirect('crm:meetings_unlock')
+
+    today = timezone.localdate()
+    q = request.GET.get('q', '').strip()
+    scope = request.GET.get('scope', 'all').strip().lower() or 'all'
+
+    meetings = get_filtered_meetings(request).prefetch_related('action_points')
+    if q:
+        meetings = meetings.filter(Q(client__icontains=q) | Q(summary__icontains=q) | Q(attendees__icontains=q))
+
+    if scope == 'open':
+        meetings = meetings.filter(action_points__status__in=[STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_ON_HOLD]).distinct()
+    elif scope == 'overdue':
+        meetings = meetings.filter(action_points__target_date__lt=today).exclude(action_points__status__iexact=STATUS_DONE).distinct()
+    elif scope == 'due_soon':
+        meetings = meetings.filter(
+            action_points__target_date__gte=today,
+            action_points__target_date__lte=today + timedelta(days=7),
+        ).exclude(action_points__status__iexact=STATUS_DONE).distinct()
+
+    all_open_actions = MeetingActionPoint.objects.exclude(status__iexact=STATUS_DONE)
+    stats = {
+        'total_meetings': MeetingLog.objects.count(),
+        'open_actions': all_open_actions.count(),
+        'overdue_actions': all_open_actions.filter(target_date__lt=today).count(),
+        'due_soon_actions': all_open_actions.filter(target_date__gte=today, target_date__lte=today + timedelta(days=7)).count(),
+    }
+
+    return render(request, 'crm/meetings_list.html', {
+        'meetings': meetings,
+        'q': q,
+        'scope': scope,
+        'stats': stats,
+        'access_state': access,
+    })
+
+
+@crm_access_required
+def create_meeting(request):
+    access = get_crm_access(request)
+    if not can_manage_meetings(access):
+        messages.info(request, 'Please unlock Meeting Feedback before logging meetings.')
+        return redirect('crm:meetings_unlock')
+    if request.method == 'POST':
+        form = MeetingLogForm(request.POST)
+        if form.is_valid():
+            meeting = form.save(commit=False)
+            if access['role'] == 'owner' and not meeting.logged_by:
+                meeting.logged_by = access['owner']
+            meeting.save()
+            log_dashboard_event(
+                dashboard_key='client_relations',
+                event_type='created',
+                section_label='Meeting Feedback',
+                record_label=meeting.client,
+                summary=f"Logged a meeting for {meeting.client}.",
+                details=meeting.summary[:200],
+                actor_label=get_actor_label(request),
+            )
+            messages.success(request, 'Meeting logged successfully.')
+            return redirect('crm:meeting_detail', pk=meeting.pk)
+    else:
+        form = MeetingLogForm(initial={'meeting_date': timezone.localdate(), 'logged_by': access.get('owner') or ''})
+
+    return render(request, 'crm/meeting_form.html', {
+        'form': form,
+        'submit_label': 'Log Meeting',
+        'page_title': 'Log a client meeting',
+        'page_subtitle': 'Capture meeting notes and raise action items for your team.',
+        'access_state': access,
+    })
+
+
+@crm_access_required
+def meeting_detail(request, pk):
+    meeting = get_object_or_404(MeetingLog, pk=pk)
+    access = get_crm_access(request)
+    if not can_manage_meetings(access):
+        messages.info(request, 'Please unlock Meeting Feedback to view meeting details.')
+        return redirect('crm:meetings_unlock')
+    action_form = MeetingActionPointForm()
+
+    if request.method == 'POST':
+        action_form = MeetingActionPointForm(request.POST)
+        if action_form.is_valid():
+            action_point = action_form.save(commit=False)
+            action_point.meeting = meeting
+            action_point.save()
+            action_point.sync_linked_action_item()
+            log_dashboard_event(
+                dashboard_key='client_relations',
+                event_type='created',
+                section_label='Meeting Action Item',
+                record_label=meeting.client,
+                summary=f"Added action item for {meeting.client} from meeting on {meeting.meeting_date}.",
+                details=action_point.description[:200],
+                actor_label=get_actor_label(request),
+            )
+            messages.success(request, 'Action item added and linked to the Client Relations Dashboard.')
+            return redirect('crm:meeting_detail', pk=meeting.pk)
+
+    action_points = meeting.action_points.all()
+    return render(request, 'crm/meeting_detail.html', {
+        'meeting': meeting,
+        'action_points': action_points,
+        'action_form': action_form,
+        'access_state': access,
+    })
+
+
+@crm_access_required
+def edit_meeting_action_point(request, meeting_pk, pk):
+    meeting = get_object_or_404(MeetingLog, pk=meeting_pk)
+    action_point = get_object_or_404(MeetingActionPoint, pk=pk, meeting=meeting)
+    access = get_crm_access(request)
+    if not can_manage_meetings(access):
+        messages.info(request, 'Please unlock Meeting Feedback to edit action items.')
+        return redirect('crm:meetings_unlock')
+
+    if request.method == 'POST':
+        form = MeetingActionPointForm(request.POST, instance=action_point)
+        if form.is_valid():
+            action_point = form.save()
+            action_point.sync_linked_action_item()
+            log_dashboard_event(
+                dashboard_key='client_relations',
+                event_type='updated',
+                section_label='Meeting Action Item',
+                record_label=meeting.client,
+                summary=f"Updated meeting action item for {meeting.client}.",
+                details=action_point.description[:200],
+                actor_label=get_actor_label(request),
+            )
+            messages.success(request, 'Action item updated and synced with the Client Relations Dashboard.')
+            return redirect('crm:meeting_detail', pk=meeting.pk)
+    else:
+        form = MeetingActionPointForm(instance=action_point)
+
+    return render(request, 'crm/meeting_action_form.html', {
+        'form': form,
+        'meeting': meeting,
+        'action_point': action_point,
+        'access_state': access,
+    })
+
+
+@crm_access_required
+def delete_meeting(request, pk):
+    access = get_crm_access(request)
+    if access['role'] != 'admin':
+        return HttpResponseForbidden('Only admin may delete meeting feedback.')
+
+    meeting = get_object_or_404(MeetingLog, pk=pk)
+    if request.method == 'POST':
+        record_label = meeting.client
+        meeting.delete()
+        log_dashboard_event(
+            dashboard_key='client_relations',
+            event_type='deleted',
+            section_label='Meeting Feedback',
+            record_label=record_label,
+            summary=f"Deleted meeting feedback for {record_label}.",
+            actor_label='CRM Admin',
+        )
+        messages.success(request, 'Meeting feedback deleted.')
+        return redirect('crm:meetings_list')
+
+    return render(request, 'crm/meeting_confirm_delete.html', {
+        'meeting': meeting,
         'access_state': access,
     })

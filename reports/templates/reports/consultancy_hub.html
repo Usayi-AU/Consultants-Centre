@@ -11,10 +11,23 @@
     <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {% for dashboard in dashboards %}
             <article class="rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
-                <p class="text-xs uppercase tracking-[0.28em] {% if dashboard.state == 'live' %}text-emerald-700{% else %}text-amber-700{% endif %}">{% if dashboard.state == 'live' %}Live{% else %}Planned{% endif %}</p>
-                <h3 class="mt-2 text-2xl font-semibold text-slate-900">{{ dashboard.name }}</h3>
+                <div class="flex items-center gap-3">
+                    {% if dashboard.icon %}
+                        <span class="flex h-12 min-w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">{{ dashboard.icon }}</span>
+                    {% endif %}
+                    <p class="text-xs uppercase tracking-[0.28em] {% if dashboard.state == 'live' %}text-emerald-700{% else %}text-amber-700{% endif %}">{% if dashboard.state == 'live' %}Live{% else %}Planned{% endif %}</p>
+                </div>
+                <h3 class="mt-3 text-2xl font-semibold text-slate-900">{{ dashboard.name }}</h3>
                 <p class="mt-3 min-h-16 text-sm text-slate-600">{{ dashboard.description }}</p>
-                <a class="mt-5 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800" href="{% url dashboard.route %}">{% if dashboard.state == 'live' %}Open dashboard{% else %}View module{% endif %}</a>
+                <div class="mt-5 flex flex-wrap items-center gap-3">
+                    <a class="inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800" href="{% url dashboard.route %}">{% if dashboard.state == 'live' %}Open dashboard{% else %}View module{% endif %}</a>
+                    {% if dashboard.meetings_route %}
+                        <a class="inline-flex items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100" href="{% url dashboard.meetings_route %}">
+                            Client Meetings
+                            <span class="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white">{{ dashboard.meetings_unseen_count|default:0 }}</span>
+                        </a>
+                    {% endif %}
+                </div>
             </article>
         {% endfor %}
     </div>

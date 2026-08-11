@@ -1,0 +1,28 @@
+{% extends 'crm/base.html' %}
+{% block title %}{{ page_title }} | Client Relations{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-2xl">
+    <div class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-soft sm:p-8">
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Meeting feedback</p>
+        <h2 class="mt-2 text-2xl font-bold text-slate-900">{{ page_title }}</h2>
+        <p class="mt-2 text-slate-600">{{ page_subtitle }}</p>
+
+        <form method="post" class="mt-6 space-y-5">
+            {% csrf_token %}
+            {% for field in form %}
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ field.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <div class="flex items-center gap-3">
+                <button type="submit" class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">{{ submit_label }}</button>
+                <a href="{% url 'crm:meetings_list' %}" class="rounded-full border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

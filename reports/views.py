@@ -49,6 +49,7 @@ from .utils import (
     status_badge_class,
 )
 from .trail import build_change_details, log_dashboard_event
+from crm.models import MeetingFeedbackSeenState, MeetingLog
 
 
 QUARTER_OPTIONS = {
@@ -100,30 +101,56 @@ from .permissions import BD_ADMIN_ACCESS_KEY, BD_TEAM_ACCESS_KEY, bd_access_key_
 
 
 def consultancy_hub(request):
+    def get_crm_meetings_unseen_count():
+        access = request.session.get('crm_access') or {}
+        if access.get('role') == 'owner' and access.get('owner'):
+            viewer_name = access.get('owner')
+        elif access.get('role') == 'admin':
+            viewer_name = 'Admin'
+        else:
+            return 0
+
+        state, _ = MeetingFeedbackSeenState.objects.get_or_create(viewer_name=viewer_name)
+        meetings = MeetingLog.objects.all()
+        if state.last_seen_at:
+            meetings = meetings.filter(
+                Q(created_at__gt=state.last_seen_at)
+                | Q(created_at=state.last_seen_at, pk__gt=state.last_seen_meeting_pk)
+            )
+        return meetings.count()
+
+    meetings_unseen_count = get_crm_meetings_unseen_count()
+
     dashboards = [
         {
             "name": "Operations Dashboard",
             "description": "Reporting tracker with operations workflow statuses.",
             "route": "unlock_access",
             "state": "live",
+            "icon": "OPS",
         },
         {
             "name": "Client Relations Dashboard",
             "description": "CRM action items, live charts, and owner/admin controls.",
             "route": "crm:unlock_access",
+            "meetings_route": "crm:meetings_unlock",
+            "meetings_unseen_count": meetings_unseen_count,
             "state": "live",
+            "icon": "CRM",
         },
         {
             "name": "Alternative Investments Dashboard",
             "description": "Alternative investment summary and detailed review tracking.",
             "route": "alt_investments_unlock",
             "state": "live",
+            "icon": "ALT",
         },
         {
             "name": "Business Development Dashboard",
             "description": "Pipeline, opportunities, IPS reviews and tenders.",
             "route": "business_development_unlock",
             "state": "live",
+            "icon": "BD",
         },
     ]
     return render(request, "reports/consultancy_hub.html", {"dashboards": dashboards})

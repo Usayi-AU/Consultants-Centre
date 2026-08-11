@@ -13,14 +13,23 @@ TRAIL_MAX_ITEMS = 150
 
 
 class DashboardContext:
-    def __init__(self, key="", label="", enabled=False):
+    def __init__(self, key="", label="", enabled=False, meetings_only=False):
         self.key = key
         self.label = label
         self.enabled = enabled
+        self.meetings_only = meetings_only
 
 
 def resolve_dashboard_context(request):
     path = request.path or ""
+
+    if path.startswith("/crm/meetings"):
+        return DashboardContext(
+            key=DashboardTrailEvent.DashboardKey.CLIENT_RELATIONS,
+            label="Client Meetings Feedback",
+            enabled=bool(request.session.get("crm_access")),
+            meetings_only=True,
+        )
 
     if path.startswith("/crm/"):
         return DashboardContext(
@@ -119,7 +128,28 @@ def parse_actor_from_crm_change(change_text):
     return token or "Admin"
 
 
-def _crm_entries(cutoff):
+def _crm_entries(cutoff, meetings_only=False):
+    if meetings_only:
+        meeting_rows = DashboardTrailEvent.objects.filter(
+            dashboard_key=DashboardTrailEvent.DashboardKey.CLIENT_RELATIONS,
+            created_at__gte=cutoff,
+            section_label__in=["Meeting Feedback", "Meeting Action Item"],
+        ).order_by("-created_at")[:TRAIL_MAX_ITEMS]
+
+        entries = []
+        for row in meeting_rows:
+            entries.append(
+                {
+                    "summary": row.summary,
+                    "details": row.details,
+                    "section": row.section_label,
+                    "record": row.record_label,
+                    "actor": row.actor_label,
+                    "timestamp": row.created_at,
+                }
+            )
+        return entries
+
     entries = []
 
     history_rows = ActionItemHistory.objects.select_related("action_item").filter(timestamp__gte=cutoff).order_by("-timestamp")[:TRAIL_MAX_ITEMS]
@@ -183,7 +213,7 @@ def build_trail_timeline(request):
 
     cutoff = timezone.now() - timedelta(days=TRAIL_LOOKBACK_DAYS)
     if dashboard_context.key == DashboardTrailEvent.DashboardKey.CLIENT_RELATIONS:
-        entries = _crm_entries(cutoff)
+        entries = _crm_entries(cutoff, meetings_only=dashboard_context.meetings_only)
     else:
         entries = _dashboard_entries(dashboard_context.key, cutoff)
 

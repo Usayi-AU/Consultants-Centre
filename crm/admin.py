@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ActionItem, ActionItemHistory, SummaryMetric
+from .models import ActionItem, ActionItemHistory, SummaryMetric, MeetingLog, MeetingActionPoint
 
 @admin.register(SummaryMetric)
 class SummaryMetricAdmin(admin.ModelAdmin):
@@ -17,3 +17,23 @@ class ActionItemAdmin(admin.ModelAdmin):
 class ActionItemHistoryAdmin(admin.ModelAdmin):
     list_display = ('action_item', 'changed_by', 'timestamp')
     search_fields = ('action_item__client', 'changed_by__username', 'changes')
+
+
+class MeetingActionPointInline(admin.TabularInline):
+    model = MeetingActionPoint
+    extra = 0
+
+
+@admin.register(MeetingLog)
+class MeetingLogAdmin(admin.ModelAdmin):
+    list_display = ('client', 'meeting_date', 'logged_by', 'open_action_count')
+    list_filter = ('client',)
+    search_fields = ('client', 'summary', 'attendees')
+    inlines = [MeetingActionPointInline]
+
+
+@admin.register(MeetingActionPoint)
+class MeetingActionPointAdmin(admin.ModelAdmin):
+    list_display = ('meeting', 'owner', 'status', 'target_date', 'linked_action_item')
+    list_filter = ('status',)
+    search_fields = ('description', 'owner', 'meeting__client')
