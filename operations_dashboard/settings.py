@@ -63,6 +63,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "crm.context_processors.crm_access_state",
+                "reports.context_processors.dashboard_trail_context",
             ],
         },
     }

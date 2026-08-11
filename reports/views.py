@@ -5,6 +5,7 @@ from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.db.models.functions import TruncDate
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -21,6 +22,7 @@ from .models import (
     SelfGeneratedTarget,
     SharePointTrackerEntry,
     StatusPhase,
+    TenderOutcomeUpdate,
     TenderReferralEntry,
 )
 from .permissions import (
@@ -46,6 +48,7 @@ from .utils import (
     split_alt_text_blocks,
     status_badge_class,
 )
+from .trail import build_change_details, log_dashboard_event
 
 
 QUARTER_OPTIONS = {
@@ -60,59 +63,23 @@ def get_selected_quarter(request):
     return quarter if quarter in QUARTER_OPTIONS else "q1"
 
 
+def actor_label(request, fallback_label):
+    if request.user.is_authenticated:
+        return request.user.get_username() or fallback_label
+    return fallback_label
+
+
 def get_quarterly_reports(quarter):
-    return list(ClientReport.objects.filter(quarter=quarter))
+    if quarter == "q1":
+        return list(ClientReport.objects.all())
 
-
-def ensure_quarter_reports(quarter):
-    if quarter == "q1" or ClientReport.objects.filter(quarter=quarter).exists():
-        return
-
-    source_reports = list(ClientReport.objects.filter(quarter="q1"))
-    if not source_reports:
-        return
-
-    ClientReport.objects.bulk_create(
-        [
-            ClientReport(
-                quarter=quarter,
-                client_name=report.client_name,
-                crm_name=report.crm_name,
-                operations_assignee=report.operations_assignee,
-                due_date=report.due_date,
-                status_phase=StatusPhase.PENDING,
-                notes=report.notes,
-            )
-            for report in source_reports
-        ]
-    )
-
-
-def ensure_quarter_sharepoint_entries(quarter):
-    if quarter == "q1" or SharePointTrackerEntry.objects.filter(quarter=quarter).exists():
-        return
-
-    source_entries = list(SharePointTrackerEntry.objects.filter(quarter="q1"))
-    if not source_entries:
-        return
-
-    SharePointTrackerEntry.objects.bulk_create(
-        [
-            SharePointTrackerEntry(
-                quarter=quarter,
-                client_name=entry.client_name,
-                crm_name=entry.crm_name,
-                alternate_name=entry.alternate_name,
-                word_submitted=False,
-                excel_submitted=False,
-                pdf_submitted=False,
-                due_date=entry.due_date,
-                status=SharePointTrackerEntry.Status.PENDING,
-                notes=entry.notes,
-            )
-            for entry in source_entries
-        ]
-    )
+    reports = list(ClientReport.objects.all())
+    for report in reports:
+        report.status_phase = StatusPhase.PENDING
+        report.submitted_tick = False
+        report.reviewed_tick = False
+        report.sent_to_client_tick = False
+    return reports
 
 
 def filter_reports(reports, search_query="", status_filter=""):
@@ -171,13 +138,13 @@ def unlock_access(request):
             request.session["access_key"] = ADMIN_ACCESS_KEY
             request.session["access_level"] = "admin"
             request.session["operations_dashboard_quarter"] = quarter
-            messages.success(request, f"Admin passkey accepted. You are now in {QUARTER_OPTIONS[quarter]}.")
+            messages.success(request, f"Admin passkey accepted. {QUARTER_OPTIONS[quarter]} selected.")
             return redirect("dashboard")
         if passkey == TEAM_ACCESS_KEY:
             request.session["access_key"] = TEAM_ACCESS_KEY
             request.session["access_level"] = "team"
             request.session["operations_dashboard_quarter"] = quarter
-            messages.success(request, f"Team passkey accepted. You are now in {QUARTER_OPTIONS[quarter]}.")
+            messages.success(request, f"Team passkey accepted. {QUARTER_OPTIONS[quarter]} selected.")
             return redirect("dashboard")
         messages.error(request, "Invalid passkey.")
 
@@ -217,7 +184,6 @@ def exit_access(request):
 @access_key_required
 def dashboard(request):
     selected_quarter = get_selected_quarter(request)
-    ensure_quarter_reports(selected_quarter)
     search_query = request.GET.get("q", "").strip()
     reports = get_quarterly_reports(selected_quarter)
     reports = filter_reports(reports, search_query=search_query)
@@ -262,7 +228,6 @@ def dashboard(request):
 @access_key_required
 def report_tracker(request):
     selected_quarter = get_selected_quarter(request)
-    ensure_quarter_reports(selected_quarter)
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
     reports = get_quarterly_reports(selected_quarter)
@@ -287,7 +252,6 @@ def report_tracker(request):
 @access_key_required
 def operations_staff_view(request):
     selected_quarter = get_selected_quarter(request)
-    ensure_quarter_reports(selected_quarter)
     reports = get_quarterly_reports(selected_quarter)
     return render(
         request,
@@ -304,12 +268,32 @@ def operations_staff_view(request):
 @ops_admin_required
 @access_key_required
 def edit_report(request, pk):
-    selected_quarter = get_selected_quarter(request)
-    report = get_object_or_404(ClientReport, pk=pk, quarter=selected_quarter)
+    report = get_object_or_404(ClientReport, pk=pk)
     if request.method == "POST":
         form = ReportStatusForm(request.POST, instance=report)
         if form.is_valid():
+            details = build_change_details(
+                form,
+                {
+                    "status_phase": "Status Phase",
+                    "submitted_tick": "Submitted",
+                    "reviewed_tick": "Reviewed",
+                    "sent_to_client_tick": "Sent to Client",
+                    "due_date": "Due Date",
+                    "notes": "Notes",
+                },
+            )
             form.save()
+            event_type = "status_changed" if "status_phase" in form.changed_data else "updated"
+            log_dashboard_event(
+                dashboard_key="operations",
+                event_type=event_type,
+                section_label="Report Tracker",
+                record_label=report.client_name,
+                summary=f"Updated report for {report.client_name}.",
+                details=details,
+                actor_label=actor_label(request, "Operations Admin"),
+            )
             messages.success(request, f"Updated {report.client_name}.")
             return redirect("report_tracker")
     else:
@@ -321,16 +305,18 @@ def edit_report(request, pk):
 @access_key_required
 def sharepoint_tracker(request):
     selected_quarter = get_selected_quarter(request)
-    if not SharePointTrackerEntry.objects.filter(quarter="q1").exists():
+    if selected_quarter == "q1" and not SharePointTrackerEntry.objects.exists():
         call_command("import_sharepoint_tracker")
-    ensure_quarter_sharepoint_entries(selected_quarter)
 
     search_query = request.GET.get("q", "").strip()
-    entries = list(SharePointTrackerEntry.objects.filter(quarter=selected_quarter))
+    entries = list(SharePointTrackerEntry.objects.all())
 
-    for entry in entries:
-        entry.sync_status()
-        entry.save(update_fields=["status"])
+    if selected_quarter == "q1":
+        for entry in entries:
+            entry.sync_status()
+            entry.save(update_fields=["status"])
+    elif selected_quarter in {"q2", "q3"}:
+        entries = []
 
     if search_query:
         entries = [
@@ -358,12 +344,35 @@ def sharepoint_tracker(request):
 @ops_admin_required
 @access_key_required
 def edit_sharepoint_entry(request, pk):
-    selected_quarter = get_selected_quarter(request)
-    entry = get_object_or_404(SharePointTrackerEntry, pk=pk, quarter=selected_quarter)
+    entry = get_object_or_404(SharePointTrackerEntry, pk=pk)
     if request.method == "POST":
         form = SharePointTrackerEntryForm(request.POST, instance=entry)
         if form.is_valid():
+            details = build_change_details(
+                form,
+                {
+                    "client_name": "Client",
+                    "crm_name": "CRM",
+                    "alternate_name": "Alternate Name",
+                    "word_submitted": "Word Submitted",
+                    "excel_submitted": "Excel Submitted",
+                    "pdf_submitted": "PDF Submitted",
+                    "due_date": "Due Date",
+                    "status": "Status",
+                    "notes": "Notes",
+                },
+            )
             form.save()
+            event_type = "status_changed" if "status" in form.changed_data else "updated"
+            log_dashboard_event(
+                dashboard_key="operations",
+                event_type=event_type,
+                section_label="SharePoint Tracker",
+                record_label=entry.client_name,
+                summary=f"Updated SharePoint tracker entry for {entry.client_name}.",
+                details=details,
+                actor_label=actor_label(request, "Operations Admin"),
+            )
             messages.success(request, f"Updated {entry.client_name}.")
             return redirect("sharepoint_tracker")
     else:
@@ -375,10 +384,19 @@ def edit_sharepoint_entry(request, pk):
 @ops_admin_required
 @access_key_required
 def delete_sharepoint_entry(request, pk):
-    selected_quarter = get_selected_quarter(request)
-    entry = get_object_or_404(SharePointTrackerEntry, pk=pk, quarter=selected_quarter)
+    entry = get_object_or_404(SharePointTrackerEntry, pk=pk)
     if request.method == "POST":
+        record_label = entry.client_name
         entry.delete()
+        log_dashboard_event(
+            dashboard_key="operations",
+            event_type="deleted",
+            section_label="SharePoint Tracker",
+            record_label=record_label,
+            summary=f"Deleted SharePoint tracker entry for {record_label}.",
+            details="Record removed from SharePoint tracker.",
+            actor_label=actor_label(request, "Operations Admin"),
+        )
         messages.success(request, f"Deleted {entry.client_name}.")
         return redirect("sharepoint_tracker")
     return redirect("sharepoint_tracker")
@@ -516,6 +534,7 @@ def business_development_dashboard(request):
         "ic_crm": top_counts(ips, "ic_crm"),
         "admin_crm": top_counts(ips, "admin_crm"),
     }
+
     return render(
         request,
         "reports/business_development_dashboard.html",
@@ -543,13 +562,123 @@ def ips_reviews_list(request):
 @bd_access_key_required
 def tenders_list(request):
     rows = TenderReferralEntry.objects.all().order_by("source_section", "client_name")
+    tender_updates = TenderOutcomeUpdate.objects.select_related("tender").order_by("-updated_at", "-created_at")
+
+    latest_update_by_tender = {}
+    for update in tender_updates:
+        latest_update_by_tender.setdefault(update.tender_id, update)
 
     sections = {}
     for row in rows:
+        latest_update = latest_update_by_tender.get(row.pk)
+        if latest_update:
+            row.current_outcome_status = latest_update.outcome_status
+            row.current_outcome_update = latest_update.outcome_update
+            row.current_outcome_badge_class = latest_update.outcome_badge_class
+        else:
+            row.current_outcome_status = row.get_outcome_status_display()
+            row.current_outcome_update = row.outcome_update
+            row.current_outcome_badge_class = row.outcome_badge_class
         section = (row.source_section or "Unsectioned").strip()
         sections.setdefault(section, []).append(row)
 
-    return render(request, "reports/tenders_list.html", {"sections": sections, "is_bd_admin": is_bd_admin(request)})
+    return render(
+        request,
+        "reports/tenders_list.html",
+        {
+            "sections": sections,
+            "is_bd_admin": is_bd_admin(request),
+            "tender_updates": tender_updates,
+        },
+    )
+
+
+@bd_access_key_required
+@bd_admin_required
+def tender_update_add(request):
+    from .forms import TenderOutcomeUpdateForm
+
+    if request.method == "POST":
+        form = TenderOutcomeUpdateForm(request.POST)
+        if form.is_valid():
+            update = form.save()
+            tender = update.tender
+            tender.outcome_status = update.outcome_status
+            tender.outcome_update = update.outcome_update
+            tender.save(update_fields=["outcome_status", "outcome_update", "updated_at"])
+            log_dashboard_event(
+                dashboard_key="business_development",
+                event_type="status_changed",
+                section_label="Tender Updates",
+                record_label=tender.client_name,
+                summary=f"Added tender outcome update for {tender.client_name}.",
+                details=f"Outcome set to {update.get_outcome_status_display()}. Update: {update.outcome_update or '-'}",
+                actor_label=actor_label(request, "BD Admin"),
+            )
+            messages.success(request, "Tender update added.")
+            return redirect("tenders_list")
+    else:
+        form = TenderOutcomeUpdateForm()
+    return render(request, "reports/tender_update_form.html", {"form": form})
+
+
+@bd_access_key_required
+@bd_admin_required
+def tender_update_edit(request, pk):
+    from .forms import TenderOutcomeUpdateForm
+
+    obj = get_object_or_404(TenderOutcomeUpdate, pk=pk)
+    if request.method == "POST":
+        form = TenderOutcomeUpdateForm(request.POST, instance=obj)
+        if form.is_valid():
+            details = build_change_details(
+                form,
+                {
+                    "tender": "Tender",
+                    "outcome_status": "Outcome Status",
+                    "outcome_update": "Outcome Update",
+                },
+            )
+            update = form.save()
+            tender = update.tender
+            tender.outcome_status = update.outcome_status
+            tender.outcome_update = update.outcome_update
+            tender.save(update_fields=["outcome_status", "outcome_update", "updated_at"])
+            log_dashboard_event(
+                dashboard_key="business_development",
+                event_type="status_changed",
+                section_label="Tender Updates",
+                record_label=tender.client_name,
+                summary=f"Edited tender outcome update for {tender.client_name}.",
+                details=details,
+                actor_label=actor_label(request, "BD Admin"),
+            )
+            messages.success(request, "Tender update edited.")
+            return redirect("tenders_list")
+    else:
+        form = TenderOutcomeUpdateForm(instance=obj)
+    return render(request, "reports/tender_update_form.html", {"form": form, "obj": obj})
+
+
+@bd_access_key_required
+@bd_admin_required
+def tender_update_delete(request, pk):
+    obj = get_object_or_404(TenderOutcomeUpdate, pk=pk)
+    if request.method == "POST":
+        record_label = obj.tender.client_name
+        obj.delete()
+        log_dashboard_event(
+            dashboard_key="business_development",
+            event_type="deleted",
+            section_label="Tender Updates",
+            record_label=record_label,
+            summary=f"Deleted tender outcome update for {record_label}.",
+            details="A tender outcome update entry was removed.",
+            actor_label=actor_label(request, "BD Admin"),
+        )
+        messages.success(request, "Tender update deleted.")
+        return redirect("tenders_list")
+    return render(request, "reports/tender_update_delete_confirm.html", {"obj": obj})
 
 
 @bd_access_key_required
@@ -572,7 +701,16 @@ def ips_review_add(request):
     if request.method == "POST":
         form = IPSReviewEntryForm(request.POST)
         if form.is_valid():
-            form.save()
+            item = form.save()
+            log_dashboard_event(
+                dashboard_key="business_development",
+                event_type="created",
+                section_label="IPS Reviews",
+                record_label=item.fund_name,
+                summary=f"Added new IPS review for {item.fund_name}.",
+                details=f"IC CRM: {item.ic_crm or '-'}; Admin CRM: {item.admin_crm or '-'}",
+                actor_label=actor_label(request, "BD Admin"),
+            )
             messages.success(request, "IPS review added.")
             return redirect("ips_reviews_list")
     else:
@@ -587,6 +725,15 @@ def ips_review_delete(request, pk):
     if request.method == "POST":
         fund = obj.fund_name
         obj.delete()
+        log_dashboard_event(
+            dashboard_key="business_development",
+            event_type="deleted",
+            section_label="IPS Reviews",
+            record_label=fund,
+            summary=f"Deleted IPS review for {fund}.",
+            details="IPS review record removed.",
+            actor_label=actor_label(request, "BD Admin"),
+        )
         messages.success(request, f"Deleted {fund}.")
         return redirect("ips_reviews_list")
     return render(request, "reports/ips_review_delete_confirm.html", {"obj": obj})
@@ -601,7 +748,17 @@ def ips_review_edit(request, pk):
     if request.method == "POST":
         form = IPSReviewEntryForm(request.POST, instance=obj)
         if form.is_valid():
+            details = build_change_details(form)
             form.save()
+            log_dashboard_event(
+                dashboard_key="business_development",
+                event_type="updated",
+                section_label="IPS Reviews",
+                record_label=obj.fund_name,
+                summary=f"Updated IPS review for {obj.fund_name}.",
+                details=details,
+                actor_label=actor_label(request, "BD Admin"),
+            )
             messages.success(request, "IPS review updated.")
             return redirect("ips_reviews_list")
     else:
@@ -617,7 +774,16 @@ def tender_add(request):
     if request.method == "POST":
         form = TenderReferralEntryForm(request.POST)
         if form.is_valid():
-            form.save()
+            item = form.save()
+            log_dashboard_event(
+                dashboard_key="business_development",
+                event_type="created",
+                section_label="Tenders & Referrals",
+                record_label=item.client_name,
+                summary=f"Added new tender/referral for {item.client_name}.",
+                details=f"Outcome status: {item.get_outcome_status_display()}",
+                actor_label=actor_label(request, "BD Admin"),
+            )
             messages.success(request, "Tender/Referral added.")
             return redirect("tenders_list")
     else:
@@ -634,7 +800,18 @@ def tender_edit(request, pk):
     if request.method == "POST":
         form = TenderReferralEntryForm(request.POST, instance=obj)
         if form.is_valid():
+            details = build_change_details(form)
             form.save()
+            event_type = "status_changed" if "outcome_status" in form.changed_data else "updated"
+            log_dashboard_event(
+                dashboard_key="business_development",
+                event_type=event_type,
+                section_label="Tenders & Referrals",
+                record_label=obj.client_name,
+                summary=f"Updated tender/referral for {obj.client_name}.",
+                details=details,
+                actor_label=actor_label(request, "BD Admin"),
+            )
             messages.success(request, "Tender/Referral updated.")
             return redirect("tenders_list")
     else:
@@ -649,6 +826,15 @@ def tender_delete(request, pk):
     if request.method == "POST":
         client_name = obj.client_name
         obj.delete()
+        log_dashboard_event(
+            dashboard_key="business_development",
+            event_type="deleted",
+            section_label="Tenders & Referrals",
+            record_label=client_name,
+            summary=f"Deleted tender/referral record for {client_name}.",
+            details="Tender/referral record removed.",
+            actor_label=actor_label(request, "BD Admin"),
+        )
         messages.success(request, f"Deleted {client_name}.")
         return redirect(reverse("tenders_list") + "#tenders")
     return render(request, "reports/tender_delete_confirm.html", {"obj": obj})
@@ -662,7 +848,16 @@ def target_add(request):
     if request.method == "POST":
         form = SelfGeneratedTargetForm(request.POST)
         if form.is_valid():
-            form.save()
+            item = form.save()
+            log_dashboard_event(
+                dashboard_key="business_development",
+                event_type="created",
+                section_label="Self-Generated Targets",
+                record_label=item.client_name,
+                summary=f"Added self-generated target for {item.client_name}.",
+                details=f"Business target: {item.business_target or '-'}",
+                actor_label=actor_label(request, "BD Admin"),
+            )
             messages.success(request, "Self-generated target added.")
             return redirect(reverse("self_generated_list") + "#targets")
     else:
@@ -679,7 +874,17 @@ def target_edit(request, pk):
     if request.method == "POST":
         form = SelfGeneratedTargetForm(request.POST, instance=obj)
         if form.is_valid():
+            details = build_change_details(form)
             form.save()
+            log_dashboard_event(
+                dashboard_key="business_development",
+                event_type="updated",
+                section_label="Self-Generated Targets",
+                record_label=obj.client_name,
+                summary=f"Updated self-generated target for {obj.client_name}.",
+                details=details,
+                actor_label=actor_label(request, "BD Admin"),
+            )
             messages.success(request, "Self-generated target updated.")
             return redirect(reverse("self_generated_list") + "#targets")
     else:
@@ -694,6 +899,15 @@ def target_delete(request, pk):
     if request.method == "POST":
         client_name = obj.client_name
         obj.delete()
+        log_dashboard_event(
+            dashboard_key="business_development",
+            event_type="deleted",
+            section_label="Self-Generated Targets",
+            record_label=client_name,
+            summary=f"Deleted self-generated target for {client_name}.",
+            details="Self-generated target record removed.",
+            actor_label=actor_label(request, "BD Admin"),
+        )
         messages.success(request, f"Deleted {client_name}.")
         return redirect(reverse("self_generated_list") + "#targets")
     return render(request, "reports/target_delete_confirm.html", {"obj": obj})
@@ -877,7 +1091,16 @@ def proposal_add(request):
             proposal.created_by = request.user
         form = ProposalForm(request.POST, instance=proposal)
         if form.is_valid():
-            form.save()
+            created = form.save()
+            log_dashboard_event(
+                dashboard_key="alternative_investments",
+                event_type="created",
+                section_label="Proposals",
+                record_label=created.proposal_name,
+                summary=f"Added proposal: {created.proposal_name}.",
+                details=f"Status: {created.get_status_display()}",
+                actor_label=actor_label(request, "Alternative Investments Admin"),
+            )
             messages.success(request, "Proposal added successfully.")
             return redirect("proposals_list")
     else:
@@ -902,7 +1125,18 @@ def proposal_edit(request, pk):
     if request.method == "POST":
         form = ProposalForm(request.POST, instance=proposal)
         if form.is_valid():
+            details = build_change_details(form, {"proposal_name": "Proposal Name", "date": "Date", "status": "Status", "description": "Description"})
             form.save()
+            event_type = "status_changed" if "status" in form.changed_data else "updated"
+            log_dashboard_event(
+                dashboard_key="alternative_investments",
+                event_type=event_type,
+                section_label="Proposals",
+                record_label=proposal.proposal_name,
+                summary=f"Updated proposal: {proposal.proposal_name}.",
+                details=details,
+                actor_label=actor_label(request, "Alternative Investments Admin"),
+            )
             messages.success(request, "Proposal updated successfully.")
             return redirect("proposal_detail", pk=proposal.pk)
     else:
@@ -926,7 +1160,17 @@ def proposal_edit(request, pk):
 def proposal_delete(request, pk):
     proposal = get_object_or_404(Proposal, pk=pk)
     if request.method == "POST":
+        proposal_name = proposal.proposal_name
         proposal.delete()
+        log_dashboard_event(
+            dashboard_key="alternative_investments",
+            event_type="deleted",
+            section_label="Proposals",
+            record_label=proposal_name,
+            summary=f"Deleted proposal: {proposal_name}.",
+            details="Proposal record removed.",
+            actor_label=actor_label(request, "Alternative Investments Admin"),
+        )
         messages.success(request, "Proposal deleted successfully.")
         return redirect("proposals_list")
     return render(
@@ -951,6 +1195,15 @@ def proposal_document_upload(request, pk):
                 file=uploaded_file,
                 document_name=uploaded_file.name,
             )
+        log_dashboard_event(
+            dashboard_key="alternative_investments",
+            event_type="updated",
+            section_label="Proposal Documents",
+            record_label=proposal.proposal_name,
+            summary=f"Uploaded {len(files)} document(s) to {proposal.proposal_name}.",
+            details=", ".join(uploaded_file.name for uploaded_file in files[:6]),
+            actor_label=actor_label(request, "Alternative Investments Admin"),
+        )
         messages.success(request, f"{len(files)} document(s) uploaded successfully.")
         return redirect("proposal_detail", pk=proposal.pk)
     return redirect("proposal_detail", pk=proposal.pk)
@@ -962,7 +1215,17 @@ def proposal_document_delete(request, pk):
     document = get_object_or_404(ProposalDocument, pk=pk)
     proposal = document.proposal
     if request.method == "POST":
+        document_name = document.document_name or document.file.name
         document.delete()
+        log_dashboard_event(
+            dashboard_key="alternative_investments",
+            event_type="deleted",
+            section_label="Proposal Documents",
+            record_label=proposal.proposal_name,
+            summary=f"Deleted document from {proposal.proposal_name}.",
+            details=document_name,
+            actor_label=actor_label(request, "Alternative Investments Admin"),
+        )
         messages.success(request, "Document deleted successfully.")
         return redirect("proposal_detail", pk=proposal.pk)
     return render(
@@ -1001,7 +1264,22 @@ def alt_investments_dashboard(request):
     if is_alt_admin(request) and request.method == "POST":
         form = DashboardSettingsForm(request.POST, instance=settings_obj)
         if form.is_valid():
+            details = build_change_details(form, {
+                "manager_count_label": "Asset Managers",
+                "pension_funds_label": "Pension Funds",
+                "best_performers": "Best Performers",
+                "distressed_count": "On Hold / Distressed",
+            })
             form.save()
+            log_dashboard_event(
+                dashboard_key="alternative_investments",
+                event_type="updated",
+                section_label="Summary Banner",
+                record_label="Dashboard Summary",
+                summary="Updated alternative investments summary banner.",
+                details=details,
+                actor_label=actor_label(request, "Alternative Investments Admin"),
+            )
             messages.success(request, "Dashboard summary updated.")
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({
@@ -1046,7 +1324,18 @@ def alt_investment_detail(request, pk):
         if request.method == "POST":
             form = AlternativeInvestmentItemForm(request.POST, instance=item)
             if form.is_valid():
+                details = build_change_details(form)
                 form.save()
+                event_type = "status_changed" if "status" in form.changed_data else "updated"
+                log_dashboard_event(
+                    dashboard_key="alternative_investments",
+                    event_type=event_type,
+                    section_label="Investment Reviews",
+                    record_label=item.investment_name,
+                    summary=f"Updated investment details for {item.investment_name}.",
+                    details=details,
+                    actor_label=actor_label(request, "Alternative Investments Admin"),
+                )
                 messages.success(request, f"Updated {item.investment_name}.")
                 return redirect("alt_investment_detail", pk=item.pk)
             else:
@@ -1114,7 +1403,18 @@ def alt_investment_edit(request, pk):
     if request.method == "POST":
         form = AlternativeInvestmentItemForm(request.POST, instance=item)
         if form.is_valid():
+            details = build_change_details(form)
             form.save()
+            event_type = "status_changed" if "status" in form.changed_data else "updated"
+            log_dashboard_event(
+                dashboard_key="alternative_investments",
+                event_type=event_type,
+                section_label="Investment Reviews",
+                record_label=item.investment_name,
+                summary=f"Updated investment review for {item.investment_name}.",
+                details=details,
+                actor_label=actor_label(request, "Alternative Investments Admin"),
+            )
             messages.success(request, f"Updated {item.investment_name}.")
             return redirect("alt_investments_reviews")
     else:
@@ -1140,6 +1440,15 @@ def alt_investment_add(request):
         form = AlternativeInvestmentItemForm(request.POST)
         if form.is_valid():
             item = form.save()
+            log_dashboard_event(
+                dashboard_key="alternative_investments",
+                event_type="created",
+                section_label="Investment Reviews",
+                record_label=item.investment_name,
+                summary=f"Added alternative investment: {item.investment_name}.",
+                details=f"Status: {item.get_status_display()}",
+                actor_label=actor_label(request, "Alternative Investments Admin"),
+            )
             messages.success(request, f"Created {item.investment_name}.")
             return redirect("alt_investment_detail", pk=item.pk)
     else:
@@ -1165,6 +1474,15 @@ def alt_investment_delete(request, pk):
     if request.method == "POST":
         investment_name = item.investment_name
         item.delete()
+        log_dashboard_event(
+            dashboard_key="alternative_investments",
+            event_type="deleted",
+            section_label="Investment Reviews",
+            record_label=investment_name,
+            summary=f"Deleted alternative investment: {investment_name}.",
+            details="Alternative investment record removed.",
+            actor_label=actor_label(request, "Alternative Investments Admin"),
+        )
         messages.success(request, f"Deleted {investment_name}.")
         return redirect("alt_investments_reviews")
 

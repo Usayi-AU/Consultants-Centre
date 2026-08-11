@@ -1,6 +1,15 @@
 from django.contrib import admin
 
-from .models import AlternativeInvestmentItem, CRMActionHistory, CRMActionItem, ClientReport, Proposal, ProposalDocument, SharePointTrackerEntry
+from .models import (
+    AlternativeInvestmentItem,
+    CRMActionHistory,
+    CRMActionItem,
+    ClientReport,
+    DashboardTrailEvent,
+    Proposal,
+    ProposalDocument,
+    SharePointTrackerEntry,
+)
 
 
 @admin.register(ClientReport)
@@ -51,6 +60,14 @@ class CRMActionHistoryAdmin(admin.ModelAdmin):
     list_display = ("client_name", "action_type", "actor_role", "status", "created_at")
     list_filter = ("action_type", "actor_role", "status")
     search_fields = ("client_name", "crm_owner", "action_item_text", "progress_update")
+    ordering = ("-created_at",)
+
+
+@admin.register(DashboardTrailEvent)
+class DashboardTrailEventAdmin(admin.ModelAdmin):
+    list_display = ("dashboard_key", "event_type", "section_label", "record_label", "actor_label", "created_at")
+    list_filter = ("dashboard_key", "event_type")
+    search_fields = ("summary", "details", "record_label", "section_label", "actor_label")
     ordering = ("-created_at",)
 
 

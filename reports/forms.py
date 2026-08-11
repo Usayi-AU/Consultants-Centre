@@ -12,6 +12,7 @@ from .models import (
     SharePointTrackerEntry,
     SelfGeneratedTarget,
     StatusPhase,
+    TenderOutcomeUpdate,
     TenderReferralEntry,
 )
 
@@ -288,6 +289,7 @@ class IPSReviewEntryForm(forms.ModelForm):
             "replacement_ratios",
             "date_data_received",
             "date_sent_to_client",
+            "last_ips_signed_date",
             "workshop_required",
             "asset_mgr_mandates",
             "status_comments",
@@ -302,6 +304,7 @@ class IPSReviewEntryForm(forms.ModelForm):
             "replacement_ratios": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
             "date_data_received": forms.DateInput(attrs={"type": "date", "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
             "date_sent_to_client": forms.DateInput(attrs={"type": "date", "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "last_ips_signed_date": forms.DateInput(attrs={"type": "date", "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
             "workshop_required": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"}),
             "asset_mgr_mandates": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
             "status_comments": forms.Textarea(attrs={"rows": 5, "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
@@ -320,6 +323,8 @@ class TenderReferralEntryForm(forms.ModelForm):
             "date_requested",
             "date_submitted",
             "status_comments",
+            "outcome_status",
+            "outcome_update",
         ]
         widgets = {
             "source_section": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
@@ -330,7 +335,17 @@ class TenderReferralEntryForm(forms.ModelForm):
             "date_requested": forms.DateInput(attrs={"type": "date", "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
             "date_submitted": forms.DateInput(attrs={"type": "date", "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
             "status_comments": forms.Textarea(attrs={"rows": 5, "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "outcome_status": forms.Select(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "outcome_update": forms.Textarea(attrs={"rows": 4, "placeholder": "Optional outcome notes from admin", "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        outcome_status = cleaned_data.get("outcome_status")
+        date_submitted = cleaned_data.get("date_submitted")
+        if outcome_status in {TenderReferralEntry.OutcomeStatus.WON, TenderReferralEntry.OutcomeStatus.LOST} and not date_submitted:
+            self.add_error("date_submitted", "Add the submission date before marking the tender as won or lost.")
+        return cleaned_data
 
 
 class SelfGeneratedTargetForm(forms.ModelForm):
@@ -379,3 +394,27 @@ class SelfGeneratedTargetForm(forms.ModelForm):
         if commit:
             obj.save()
         return obj
+
+
+class TenderOutcomeUpdateForm(forms.ModelForm):
+    class Meta:
+        model = TenderOutcomeUpdate
+        fields = ["tender", "outcome_status", "outcome_update"]
+        widgets = {
+            "tender": forms.Select(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "outcome_status": forms.Select(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "outcome_update": forms.Textarea(
+                attrs={
+                    "rows": 5,
+                    "placeholder": "Enter outcome details for users to view",
+                    "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["tender"].queryset = TenderReferralEntry.objects.all().order_by("client_name")
+        self.fields["tender"].label_from_instance = (
+            lambda obj: f"{obj.client_name} ({obj.source_section or 'Unsectioned'})"
+        )

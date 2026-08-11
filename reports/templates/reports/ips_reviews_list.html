@@ -18,41 +18,41 @@
     </div>
 
     <section class="rounded-[2rem] border border-white/80 bg-white p-4 shadow-panel">
-        <div class="overflow-hidden rounded-2xl border border-slate-200">
+            <div class="overflow-hidden rounded-2xl border border-slate-200">
             <div class="overflow-x-auto">
-                <table class="min-w-full text-xs md:text-sm">
+                <table class="w-full table-auto min-w-0 text-[12px]">
                     <thead class="bg-[#1f3763] text-left text-white">
                         <tr>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Fund</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">IC CRM</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Administrator</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Admin CRM</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Member Fin. Schedules</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Financial Review</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Replacement Ratios</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Date Data Received</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Date Sent to Client</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Workshop Required</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Asset Mgr Mandates</th>
-                            <th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Status / Comments</th>
-                            {% if is_bd_admin %}<th class="px-3 py-2 font-semibold uppercase tracking-[0.08em]">Action</th>{% endif %}
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Fund</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">IC CRM</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Administrator</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Admin CRM</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Member Fin. Schedules</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Financial Review</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Replacement Ratios</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Date Data Received</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Date Sent to Client</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Workshop Required</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Asset Mgr Mandates</th>
+                            <th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Status / Comments</th>
+                            {% if is_bd_admin %}<th class="px-2 py-1 font-semibold uppercase tracking-[0.08em]">Action</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 bg-white text-slate-800">
                         {% for r in rows %}
                             <tr class="hover:bg-slate-50/80 align-top">
-                                <td class="px-3 py-2 font-semibold text-slate-900">{{ r.fund_name }}</td>
-                                <td class="px-3 py-2">{{ r.ic_crm|default:"-" }}</td>
-                                <td class="px-3 py-2">{{ r.administrator|default:"-" }}</td>
-                                <td class="px-3 py-2">{{ r.admin_crm|default:"-" }}</td>
-                                <td class="px-3 py-2">{% if r.member_fin_schedules %}Yes{% else %}No{% endif %}</td>
-                                <td class="px-3 py-2">{% if r.financial_review %}Yes{% else %}No{% endif %}</td>
-                                <td class="px-3 py-2">{{ r.replacement_ratios|default:"-" }}</td>
-                                <td class="px-3 py-2">{{ r.date_data_received|default:"-" }}</td>
-                                <td class="px-3 py-2">{{ r.date_sent_to_client|default:"-" }}</td>
-                                <td class="px-3 py-2">{% if r.workshop_required %}Yes{% else %}No{% endif %}</td>
-                                <td class="px-3 py-2">{{ r.asset_mgr_mandates|default:"-" }}</td>
-                                <td class="px-3 py-2">{{ r.status_comments|default:"-" }}</td>
+                                <td class="px-2 py-1 font-semibold text-slate-900 truncate max-w-[14rem] whitespace-nowrap overflow-hidden">{{ r.fund_name }}</td>
+                                <td class="px-2 py-1 truncate max-w-[8rem] whitespace-nowrap overflow-hidden">{{ r.ic_crm|default:"-" }}</td>
+                                <td class="px-2 py-1 truncate max-w-[10rem] whitespace-nowrap overflow-hidden">{{ r.administrator|default:"-" }}</td>
+                                <td class="px-2 py-1 truncate max-w-[8rem] whitespace-nowrap overflow-hidden">{{ r.admin_crm|default:"-" }}</td>
+                                <td class="px-2 py-1">{% if r.member_fin_schedules %}Yes{% else %}No{% endif %}</td>
+                                <td class="px-2 py-1">{% if r.financial_review %}Yes{% else %}No{% endif %}</td>
+                                <td class="px-2 py-1 truncate max-w-[9rem] whitespace-nowrap overflow-hidden">{{ r.replacement_ratios|default:"-" }}</td>
+                                <td class="px-2 py-1">{{ r.date_data_received|default:"-" }}</td>
+                                <td class="px-2 py-1">{{ r.date_sent_to_client|default:"-" }}</td>
+                                <td class="px-2 py-1">{% if r.workshop_required %}Yes{% else %}No{% endif %}</td>
+                                <td class="px-2 py-1 truncate max-w-[10rem] whitespace-nowrap overflow-hidden">{{ r.asset_mgr_mandates|default:"-" }}</td>
+                                <td class="px-2 py-1 truncate max-w-[14rem] whitespace-nowrap overflow-hidden">{{ r.status_comments|default:"-" }}</td>
                                 {% if is_bd_admin %}
                                     <td class="px-3 py-2 whitespace-nowrap">
                                         <a class="font-semibold text-[#1f3763] underline decoration-slate-300 underline-offset-4 hover:decoration-[#1f3763] mr-3" href="{% url 'ips_review_edit' r.pk %}">Edit</a>

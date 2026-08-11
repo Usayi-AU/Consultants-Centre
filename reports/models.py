@@ -168,6 +168,37 @@ class CRMHistoryAction(models.TextChoices):
     IMPORTED = "imported", "Imported"
 
 
+class DashboardTrailEvent(models.Model):
+    class DashboardKey(models.TextChoices):
+        OPERATIONS = "operations", "Operations Dashboard"
+        BUSINESS_DEVELOPMENT = "business_development", "Business Development Dashboard"
+        ALTERNATIVE_INVESTMENTS = "alternative_investments", "Alternative Investments Dashboard"
+        CLIENT_RELATIONS = "client_relations", "Client Relations Dashboard"
+
+    class EventType(models.TextChoices):
+        CREATED = "created", "Created"
+        UPDATED = "updated", "Updated"
+        STATUS_CHANGED = "status_changed", "Status changed"
+        DELETED = "deleted", "Deleted"
+        ARCHIVED = "archived", "Archived"
+
+    dashboard_key = models.CharField(max_length=64, choices=DashboardKey.choices)
+    event_type = models.CharField(max_length=32, choices=EventType.choices)
+    section_label = models.CharField(max_length=120, blank=True)
+    record_label = models.CharField(max_length=255, blank=True)
+    summary = models.CharField(max_length=255)
+    details = models.TextField(blank=True)
+    actor_label = models.CharField(max_length=120, default="Admin")
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_dashboard_key_display()} - {self.summary}"
+
+
 class CRMActionItem(models.Model):
     client_name = models.CharField(max_length=255)
     crm_owner = models.CharField(max_length=120)
@@ -361,6 +392,7 @@ class IPSReviewEntry(models.Model):
     replacement_ratios = models.CharField(max_length=255, blank=True)
     date_data_received = models.DateField(null=True, blank=True)
     date_sent_to_client = models.DateField(null=True, blank=True)
+    last_ips_signed_date = models.DateField(null=True, blank=True)
     workshop_required = models.BooleanField(default=False)
     asset_mgr_mandates = models.CharField(max_length=255, blank=True)
     status_comments = models.TextField(blank=True)
@@ -375,6 +407,11 @@ class IPSReviewEntry(models.Model):
 
 
 class TenderReferralEntry(models.Model):
+    class OutcomeStatus(models.TextChoices):
+        PENDING = "pending", "Pending Outcome"
+        WON = "won", "Won"
+        LOST = "lost", "Lost"
+
     source_section = models.CharField(max_length=255, blank=True)
     client_name = models.CharField(max_length=255)
     business_type = models.CharField(max_length=255, blank=True)
@@ -382,6 +419,8 @@ class TenderReferralEntry(models.Model):
     email_address = models.CharField(max_length=255, blank=True)
     date_requested = models.DateField(null=True, blank=True)
     date_submitted = models.DateField(null=True, blank=True)
+    outcome_status = models.CharField(max_length=20, choices=OutcomeStatus.choices, default=OutcomeStatus.PENDING)
+    outcome_update = models.TextField(blank=True)
     status_comments = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -391,6 +430,40 @@ class TenderReferralEntry(models.Model):
 
     def __str__(self):
         return self.client_name
+
+    @property
+    def outcome_badge_class(self):
+        return {
+            self.OutcomeStatus.PENDING: "bg-slate-100 text-slate-700 ring-slate-200",
+            self.OutcomeStatus.WON: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+            self.OutcomeStatus.LOST: "bg-rose-100 text-rose-800 ring-rose-200",
+        }.get(self.outcome_status, "bg-slate-100 text-slate-700 ring-slate-200")
+
+
+class TenderOutcomeUpdate(models.Model):
+    tender = models.ForeignKey(TenderReferralEntry, related_name="outcome_updates", on_delete=models.CASCADE)
+    outcome_status = models.CharField(
+        max_length=20,
+        choices=TenderReferralEntry.OutcomeStatus.choices,
+        default=TenderReferralEntry.OutcomeStatus.PENDING,
+    )
+    outcome_update = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-created_at"]
+
+    def __str__(self):
+        return f"{self.tender.client_name} - {self.get_outcome_status_display()}"
+
+    @property
+    def outcome_badge_class(self):
+        return {
+            TenderReferralEntry.OutcomeStatus.PENDING: "bg-slate-100 text-slate-700 ring-slate-200",
+            TenderReferralEntry.OutcomeStatus.WON: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+            TenderReferralEntry.OutcomeStatus.LOST: "bg-rose-100 text-rose-800 ring-rose-200",
+        }.get(self.outcome_status, "bg-slate-100 text-slate-700 ring-slate-200")
 
 
 class SelfGeneratedTarget(models.Model):

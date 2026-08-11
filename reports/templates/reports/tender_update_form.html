@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{% if obj %}Edit{% else %}Add{% endif %} Tender Update | IntelleGo{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-4xl rounded-[2rem] border border-white/80 bg-white p-8 shadow-panel">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Business Development Module</p>
+            <h2 class="mt-1 text-3xl font-semibold text-slate-900">{% if obj %}Edit{% else %}Add{% endif %} Tender Update</h2>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="{% url 'tenders_list' %}">Back to Tenders</a>
+        </div>
+    </div>
+
+    <form method="post" class="space-y-5">
+        {% csrf_token %}
+        <div class="grid gap-5 md:grid-cols-2">
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_tender">Tender</label>
+                {{ form.tender }}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_outcome_status">Outcome status</label>
+                {{ form.outcome_status }}
+            </div>
+        </div>
+
+        <div>
+            <label class="mb-2 block text-sm font-medium text-slate-700" for="id_outcome_update">Outcome update comment</label>
+            {{ form.outcome_update }}
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            <button class="rounded-full bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800" type="submit">Save Update</button>
+            <a class="rounded-full border border-slate-200 px-5 py-3 font-semibold text-slate-700" href="{% url 'tenders_list' %}">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

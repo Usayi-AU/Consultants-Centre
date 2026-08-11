@@ -10,6 +10,7 @@ from django.db.models import Q
 
 from .forms import ActionItemForm
 from .models import ActionItem, ActionItemHistory, SummaryMetric, STATUS_DONE
+from reports.trail import build_change_details, log_dashboard_event
 
 
 ACCESS_SESSION_KEY = 'crm_access'
@@ -115,8 +116,24 @@ def format_history_entry(action, actor_label, action_item=None, form=None):
             f"Owner: {action_item.owner} • Status: {action_item.status}"
         )
 
-    changed_fields = ', '.join(form.changed_data) if form and form.changed_data else 'updated fields'
-    return f"Updated by {actor_label} • {changed_fields}"
+    if form and form.changed_data:
+        detail = build_change_details(
+            form,
+            {
+                'client': 'Client',
+                'action_item': 'Action Item',
+                'status': 'Status',
+                'owner': 'Owner',
+                'date_received': 'Date Received',
+                'target_date': 'Target Date',
+                'update_prev_week': 'Update Prev Week',
+                'update_this_week': 'Update This Week',
+                'completion_date': 'Completion Date',
+            },
+        )
+        return f"Updated by {actor_label} • {detail}"
+
+    return f"Updated by {actor_label} • updated fields"
 
 
 def get_filtered_items(request):
@@ -336,7 +353,18 @@ def delete_action_item(request, pk):
         return HttpResponseForbidden('Only admin may delete action items.')
     item = get_object_or_404(ActionItem, pk=pk)
     if request.method == 'POST':
+        record_label = item.client
+        action_label = item.action_item[:140]
         item.delete()
+        log_dashboard_event(
+            dashboard_key='client_relations',
+            event_type='deleted',
+            section_label='Action Items',
+            record_label=record_label,
+            summary=f"Deleted action item for {record_label}.",
+            details=action_label,
+            actor_label='CRM Admin',
+        )
         messages.success(request, 'Action item deleted.')
         return redirect('crm:client_action_items')
     return render(request, 'crm/actionitem_confirm_delete.html', {'item': item})
