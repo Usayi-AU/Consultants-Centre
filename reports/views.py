@@ -89,21 +89,6 @@ def get_quarterly_reports(quarter):
                         "notes": report.notes,
                     },
                 )
-
-        quarter_reports = list(ClientReport.objects.filter(quarter=quarter).order_by("operations_assignee", "crm_name", "client_name"))
-        for report in quarter_reports:
-            q1_report = ClientReport.objects.filter(quarter="q1", client_name=report.client_name).first()
-            if q1_report and (
-                report.status_phase == q1_report.status_phase
-                and report.submitted_tick == q1_report.submitted_tick
-                and report.reviewed_tick == q1_report.reviewed_tick
-                and report.sent_to_client_tick == q1_report.sent_to_client_tick
-            ):
-                report.status_phase = StatusPhase.PENDING
-                report.submitted_tick = False
-                report.reviewed_tick = False
-                report.sent_to_client_tick = False
-                report.save(update_fields=["status_phase", "submitted_tick", "reviewed_tick", "sent_to_client_tick"])
         return list(ClientReport.objects.filter(quarter=quarter).order_by("operations_assignee", "crm_name", "client_name"))
 
     return list(ClientReport.objects.filter(quarter=quarter).order_by("operations_assignee", "crm_name", "client_name"))
@@ -384,20 +369,7 @@ def sharepoint_tracker(request):
     search_query = request.GET.get("q", "").strip()
     entries = list(SharePointTrackerEntry.objects.filter(quarter=selected_quarter))
 
-    if selected_quarter in {"q2", "q3"}:
-        for entry in entries:
-            q1_entry = SharePointTrackerEntry.objects.filter(quarter="q1", client_name=entry.client_name).first()
-            if q1_entry and (
-                entry.word_submitted == q1_entry.word_submitted
-                and entry.excel_submitted == q1_entry.excel_submitted
-                and entry.pdf_submitted == q1_entry.pdf_submitted
-            ):
-                entry.word_submitted = False
-                entry.excel_submitted = False
-                entry.pdf_submitted = False
-                entry.sync_status()
-                entry.save(update_fields=["word_submitted", "excel_submitted", "pdf_submitted", "status"])
-    else:
+    if selected_quarter == "q1":
         for entry in entries:
             entry.sync_status()
             entry.save(update_fields=["status"])

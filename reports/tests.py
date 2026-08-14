@@ -151,6 +151,40 @@ class DashboardTemplateTests(TestCase):
         self.assertTrue(all(not entry.word_submitted and not entry.excel_submitted and not entry.pdf_submitted for entry in response.context["entries"]))
         self.assertTrue(all(entry.status == "pending" for entry in response.context["entries"]))
 
+    def test_q2_sharepoint_admin_change_persists_even_if_q1_had_same_values(self):
+        SharePointTrackerEntry.objects.create(
+            quarter="q1",
+            client_name="Client Same",
+            crm_name="CRM Same",
+            alternate_name="Alt Same",
+            word_submitted=True,
+            excel_submitted=False,
+            pdf_submitted=False,
+        )
+        q2_entry = SharePointTrackerEntry.objects.create(
+            quarter="q2",
+            client_name="Client Same",
+            crm_name="CRM Same",
+            alternate_name="Alt Same",
+            word_submitted=True,
+            excel_submitted=False,
+            pdf_submitted=False,
+        )
+
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = "q2"
+        session.save()
+
+        response = self.client.get(reverse("sharepoint_tracker"))
+
+        self.assertEqual(response.status_code, 200)
+        entry = SharePointTrackerEntry.objects.get(pk=q2_entry.pk)
+        self.assertTrue(entry.word_submitted)
+        self.assertEqual(entry.status, SharePointTrackerEntry.Status.SUBMITTED_WORD)
+        self.assertIn("Client Same", [row.client_name for row in response.context["entries"]])
+
     def test_dashboard_counts_only_selected_quarter_and_ignores_duplicates(self):
         ClientReport.objects.create(
             client_name="Client A",
