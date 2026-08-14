@@ -89,13 +89,7 @@ def get_quarterly_reports(quarter):
                         "notes": report.notes,
                     },
                 )
-        quarter_reports = list(ClientReport.objects.filter(quarter=quarter).order_by("operations_assignee", "crm_name", "client_name"))
-        for report in quarter_reports:
-            report.status_phase = StatusPhase.PENDING
-            report.submitted_tick = False
-            report.reviewed_tick = False
-            report.sent_to_client_tick = False
-        return quarter_reports
+        return list(ClientReport.objects.filter(quarter=quarter).order_by("operations_assignee", "crm_name", "client_name"))
 
     return list(ClientReport.objects.filter(quarter=quarter).order_by("operations_assignee", "crm_name", "client_name"))
 
@@ -329,14 +323,16 @@ def edit_report(request, pk):
             )
             form.save()
             event_type = "status_changed" if "status_phase" in form.changed_data else "updated"
+            quarter_label = QUARTER_OPTIONS.get(get_selected_quarter(request), "Quarter")
             log_dashboard_event(
                 dashboard_key="operations",
                 event_type=event_type,
-                section_label="Report Tracker",
+                section_label=f"Report Tracker ({quarter_label})",
                 record_label=report.client_name,
-                summary=f"Updated report for {report.client_name}.",
+                summary=f"Report status for {report.client_name} in {quarter_label} was updated.",
                 details=details,
                 actor_label=actor_label(request, "Operations Admin"),
+                metadata={"quarter": get_selected_quarter(request), "tracker": "report_tracker"},
             )
             messages.success(request, f"Updated {report.client_name}.")
             return redirect("report_tracker")
@@ -362,9 +358,9 @@ def sharepoint_tracker(request):
                     defaults={
                         "crm_name": entry.crm_name,
                         "alternate_name": entry.alternate_name,
-                        "word_submitted": entry.word_submitted,
-                        "excel_submitted": entry.excel_submitted,
-                        "pdf_submitted": entry.pdf_submitted,
+                        "word_submitted": False,
+                        "excel_submitted": False,
+                        "pdf_submitted": False,
                         "due_date": entry.due_date,
                         "notes": entry.notes,
                     },
@@ -374,8 +370,9 @@ def sharepoint_tracker(request):
     entries = list(SharePointTrackerEntry.objects.filter(quarter=selected_quarter))
 
     for entry in entries:
-        entry.sync_status()
-        entry.save(update_fields=["status"])
+        if selected_quarter == "q1":
+            entry.sync_status()
+            entry.save(update_fields=["status"])
 
     if search_query:
         entries = [
@@ -423,14 +420,16 @@ def edit_sharepoint_entry(request, pk):
             )
             form.save()
             event_type = "status_changed" if "status" in form.changed_data else "updated"
+            quarter_label = QUARTER_OPTIONS.get(get_selected_quarter(request), "Quarter")
             log_dashboard_event(
                 dashboard_key="operations",
                 event_type=event_type,
-                section_label="SharePoint Tracker",
+                section_label=f"SharePoint Tracker ({quarter_label})",
                 record_label=entry.client_name,
-                summary=f"Updated SharePoint tracker entry for {entry.client_name}.",
+                summary=f"SharePoint status for {entry.client_name} in {quarter_label} was updated.",
                 details=details,
                 actor_label=actor_label(request, "Operations Admin"),
+                metadata={"quarter": get_selected_quarter(request), "tracker": "sharepoint_tracker"},
             )
             messages.success(request, f"Updated {entry.client_name}.")
             return redirect("sharepoint_tracker")
@@ -447,14 +446,16 @@ def delete_sharepoint_entry(request, pk):
     if request.method == "POST":
         record_label = entry.client_name
         entry.delete()
+        quarter_label = QUARTER_OPTIONS.get(get_selected_quarter(request), "Quarter")
         log_dashboard_event(
             dashboard_key="operations",
             event_type="deleted",
-            section_label="SharePoint Tracker",
+            section_label=f"SharePoint Tracker ({quarter_label})",
             record_label=record_label,
-            summary=f"Deleted SharePoint tracker entry for {record_label}.",
+            summary=f"SharePoint status for {record_label} in {quarter_label} was deleted.",
             details="Record removed from SharePoint tracker.",
             actor_label=actor_label(request, "Operations Admin"),
+            metadata={"quarter": get_selected_quarter(request), "tracker": "sharepoint_tracker"},
         )
         messages.success(request, f"Deleted {entry.client_name}.")
         return redirect("sharepoint_tracker")

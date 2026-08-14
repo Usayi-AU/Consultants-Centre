@@ -7,7 +7,7 @@ from django.urls import reverse
 from openpyxl import Workbook
 
 from .management.commands.import_sharepoint_tracker import Command as ImportSharePointTrackerCommand
-from .models import ClientReport, Proposal, SharePointTrackerEntry
+from .models import ClientReport, DashboardTrailEvent, Proposal, SharePointTrackerEntry
 from .permissions import ADMIN_ACCESS_KEY, ALT_ADMIN_ACCESS_KEY
 
 
@@ -105,6 +105,52 @@ class DashboardTemplateTests(TestCase):
         self.assertGreaterEqual(response.context["summary"]["total_clients"], 1)
         self.assertEqual(response.context["summary"]["pending_count"], response.context["summary"]["total_clients"])
 
+    def test_second_quarter_report_status_persists_when_admin_updates_it(self):
+        report = ClientReport.objects.create(
+            quarter="q2",
+            client_name="Client Q2 Updated",
+            crm_name="CRM Q2",
+            operations_assignee="Ops Q2",
+            status_phase="submitted",
+            submitted_tick=True,
+        )
+
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = "q2"
+        session.save()
+
+        response = self.client.get(reverse("report_tracker"))
+
+        self.assertEqual(response.status_code, 200)
+        report.refresh_from_db()
+        self.assertEqual(report.status_phase, "submitted")
+        self.assertIn(report.client_name, [row.client_name for row in response.context["reports"]])
+
+    def test_q2_sharepoint_seed_stays_pending_until_admin_changes_it(self):
+        SharePointTrackerEntry.objects.create(
+            quarter="q1",
+            client_name="Client A",
+            crm_name="CRM A",
+            alternate_name="Alt A",
+            word_submitted=True,
+            excel_submitted=True,
+            pdf_submitted=True,
+        )
+
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = "q2"
+        session.save()
+
+        response = self.client.get(reverse("sharepoint_tracker"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(all(not entry.word_submitted and not entry.excel_submitted and not entry.pdf_submitted for entry in response.context["entries"]))
+        self.assertTrue(all(entry.status == "pending" for entry in response.context["entries"]))
+
     def test_dashboard_counts_only_selected_quarter_and_ignores_duplicates(self):
         ClientReport.objects.create(
             client_name="Client A",
@@ -177,6 +223,39 @@ class DashboardTemplateTests(TestCase):
         self.assertGreaterEqual(len(response.context["reports"]), 1)
         self.assertEqual(response.context["selected_quarter"], "q3")
         self.assertIn("Client Q1", [report.client_name for report in response.context["reports"]])
+
+    def test_report_edit_trail_uses_quarter_specific_status_summary(self):
+        report = ClientReport.objects.create(
+            quarter="q2",
+            client_name="Client Q2 Trail",
+            crm_name="CRM Trail",
+            operations_assignee="Ops Trail",
+            status_phase="pending",
+        )
+
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = "q2"
+        session.save()
+
+        response = self.client.post(
+            reverse("report_edit", args=[report.pk]),
+            {
+                "status_phase": "submitted",
+                "submitted_tick": "on",
+                "reviewed_tick": "",
+                "sent_to_client_tick": "",
+                "due_date": "",
+                "notes": "",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            DashboardTrailEvent.objects.filter(summary__icontains="Report status for").exists()
+        )
 
 
 class SharePointTrackerImportTests(TestCase):
