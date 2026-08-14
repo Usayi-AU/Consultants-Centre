@@ -7,8 +7,8 @@ from django.urls import reverse
 from openpyxl import Workbook
 
 from .management.commands.import_sharepoint_tracker import Command as ImportSharePointTrackerCommand
-from .models import ClientReport, Proposal, SharePointTrackerEntry, StatusPhase
-from .permissions import ADMIN_ACCESS_KEY, ALT_ADMIN_ACCESS_KEY, TEAM_ACCESS_KEY
+from .models import ClientReport, Proposal, SharePointTrackerEntry
+from .permissions import ADMIN_ACCESS_KEY, ALT_ADMIN_ACCESS_KEY
 
 
 class ProposalTests(TestCase):
@@ -43,7 +43,7 @@ class ProposalTests(TestCase):
 
 
 class DashboardTemplateTests(TestCase):
-    def test_sharepoint_tracker_shows_entries_for_team_second_quarter(self):
+    def test_sharepoint_tracker_uses_pending_copy_for_second_quarter(self):
         SharePointTrackerEntry.objects.create(
             quarter="q1",
             client_name="Client A",
@@ -52,30 +52,6 @@ class DashboardTemplateTests(TestCase):
             word_submitted=True,
             excel_submitted=True,
             pdf_submitted=True,
-        )
-
-        session = self.client.session
-        session["access_key"] = TEAM_ACCESS_KEY
-        session["access_level"] = "team"
-        session["operations_dashboard_quarter"] = "q2"
-        session.save()
-
-        response = self.client.get(reverse("sharepoint_tracker"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context["entries"]), 1)
-        self.assertEqual(response.context["entries"][0].quarter, "q2")
-        self.assertFalse(response.context["entries"][0].word_submitted)
-
-    def test_sharepoint_tracker_shows_entries_for_admin_second_quarter(self):
-        SharePointTrackerEntry.objects.create(
-            quarter="q1",
-            client_name="Client A",
-            crm_name="CRM 1",
-            alternate_name="Alt 1",
-            word_submitted=True,
-            excel_submitted=False,
-            pdf_submitted=False,
         )
 
         session = self.client.session
@@ -89,7 +65,6 @@ class DashboardTemplateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["entries"]), 1)
         self.assertEqual(response.context["entries"][0].client_name, "Client A")
-        self.assertEqual(response.context["entries"][0].quarter, "q2")
 
     def test_dashboard_does_not_render_outstanding_card(self):
         session = self.client.session
@@ -103,24 +78,23 @@ class DashboardTemplateTests(TestCase):
         self.assertContains(response, "Pending Reports")
         self.assertNotContains(response, "Outstanding")
 
-    def test_second_quarter_dashboard_keeps_real_status_for_team(self):
+    def test_second_quarter_dashboard_uses_pending_copy_of_reports(self):
         ClientReport.objects.create(
-            quarter="q2",
-            client_name="Client Q2 Team",
+            client_name="Client Q2",
             crm_name="CRM Q2",
             operations_assignee="Ops Q2",
-            status_phase=StatusPhase.REVIEWED,
+            quarter="q2",
         )
 
         session = self.client.session
-        session["access_key"] = TEAM_ACCESS_KEY
-        session["access_level"] = "team"
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
         session.save()
 
         response = self.client.post(
             reverse("unlock_access"),
             {
-                "passkey": TEAM_ACCESS_KEY,
+                "passkey": ADMIN_ACCESS_KEY,
                 "quarter": "q2",
             },
             follow=True,
@@ -129,116 +103,80 @@ class DashboardTemplateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["selected_quarter"], "q2")
         self.assertGreaterEqual(response.context["summary"]["total_clients"], 1)
-        self.assertEqual(response.context["summary"]["reviewed_count"], 1)
+        self.assertEqual(response.context["summary"]["pending_count"], response.context["summary"]["total_clients"])
 
-    def test_second_quarter_dashboard_keeps_real_status_for_admin(self):
+    def test_dashboard_counts_only_selected_quarter_and_ignores_duplicates(self):
         ClientReport.objects.create(
+            client_name="Client A",
+            crm_name="CRM A",
+            operations_assignee="Ops A",
+            quarter="q1",
+            status_phase="submitted",
+        )
+        ClientReport.objects.create(
+            client_name="Client A",
+            crm_name="CRM A",
+            operations_assignee="Ops A",
             quarter="q2",
-            client_name="Client Admin Q2",
-            crm_name="CRM Q2",
-            operations_assignee="Ops Q2",
-            status_phase=StatusPhase.REVIEWED,
         )
 
         session = self.client.session
         session["access_key"] = ADMIN_ACCESS_KEY
         session["access_level"] = "admin"
-        session["operations_dashboard_quarter"] = "q2"
+        session["operations_dashboard_quarter"] = "q1"
         session.save()
 
         response = self.client.get(reverse("dashboard"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["selected_quarter"], "q2")
-        self.assertEqual(response.context["summary"]["reviewed_count"], 1)
+        self.assertEqual(response.context["summary"]["total_clients"], 1)
+        self.assertEqual(response.context["summary"]["pending_count"], 0)
 
-    def test_admin_can_update_report_status_in_second_quarter(self):
-        ClientReport.objects.create(
-            quarter="q1",
-            client_name="Client Edit Q2",
-            crm_name="CRM Q1",
-            operations_assignee="Ops Q1",
-            status_phase=StatusPhase.PENDING,
-        )
-        report_q2 = ClientReport.objects.create(
-            quarter="q2",
-            client_name="Client Edit Q2",
-            crm_name="CRM Q2",
-            operations_assignee="Ops Q2",
-            status_phase=StatusPhase.PENDING,
-        )
-
-        session = self.client.session
-        session["access_key"] = ADMIN_ACCESS_KEY
-        session["access_level"] = "admin"
-        session["operations_dashboard_quarter"] = "q2"
-        session.save()
-
-        response = self.client.post(
-            reverse("report_edit", kwargs={"pk": report_q2.pk}),
-            {
-                "due_date": "",
-                "status_phase": StatusPhase.SENT_TO_CLIENT,
-                "notes": "Updated in second quarter",
-            },
-            follow=True,
-        )
-
-        report_q2.refresh_from_db()
-        report_q1 = ClientReport.objects.get(quarter="q1", client_name="Client Edit Q2")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(report_q2.status_phase, StatusPhase.SENT_TO_CLIENT)
-        self.assertEqual(report_q1.status_phase, StatusPhase.PENDING)
-        self.assertEqual(response.context["selected_quarter"], "q2")
-
-    def test_admin_sharepoint_update_in_second_quarter_does_not_change_first_quarter(self):
+    def test_second_and_third_quarter_sharepoint_tracker_are_seeded_from_q1(self):
         SharePointTrackerEntry.objects.create(
             quarter="q1",
-            client_name="Client S",
-            crm_name="CRM 1",
+            client_name="Client A",
+            crm_name="CRM A",
+            alternate_name="Alt A",
             word_submitted=True,
-            excel_submitted=False,
+            excel_submitted=True,
             pdf_submitted=False,
         )
-        sharepoint_q2 = SharePointTrackerEntry.objects.create(
-            quarter="q2",
-            client_name="Client S",
-            crm_name="CRM 2",
-            word_submitted=False,
-            excel_submitted=False,
-            pdf_submitted=False,
+
+        for quarter in ["q2", "q3"]:
+            session = self.client.session
+            session["access_key"] = ADMIN_ACCESS_KEY
+            session["access_level"] = "admin"
+            session["operations_dashboard_quarter"] = quarter
+            session.save()
+
+            response = self.client.get(reverse("sharepoint_tracker"))
+
+            self.assertEqual(response.status_code, 200)
+            self.assertGreaterEqual(len(response.context["entries"]), 1)
+            self.assertIn("Client A", [entry.client_name for entry in response.context["entries"]])
+
+    def test_third_quarter_report_tracker_is_seeded_from_q1(self):
+        ClientReport.objects.create(
+            quarter="q1",
+            client_name="Client Q1",
+            crm_name="CRM 1",
+            operations_assignee="Ops 1",
+            status_phase="submitted",
         )
 
         session = self.client.session
         session["access_key"] = ADMIN_ACCESS_KEY
         session["access_level"] = "admin"
-        session["operations_dashboard_quarter"] = "q2"
+        session["operations_dashboard_quarter"] = "q3"
         session.save()
 
-        response = self.client.post(
-            reverse("edit_sharepoint_entry", kwargs={"pk": sharepoint_q2.pk}),
-            {
-                "client_name": "Client S",
-                "crm_name": "CRM 2",
-                "alternate_name": "",
-                "word_submitted": "on",
-                "excel_submitted": "on",
-                "pdf_submitted": "",
-                "due_date": "",
-                "notes": "Updated in q2",
-            },
-            follow=True,
-        )
+        response = self.client.get(reverse("report_tracker"))
 
-        sharepoint_q2.refresh_from_db()
-        sharepoint_q1 = SharePointTrackerEntry.objects.get(quarter="q1", client_name="Client S")
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(sharepoint_q2.word_submitted)
-        self.assertTrue(sharepoint_q2.excel_submitted)
-        self.assertFalse(sharepoint_q2.pdf_submitted)
-        self.assertTrue(sharepoint_q1.word_submitted)
-        self.assertFalse(sharepoint_q1.excel_submitted)
-        self.assertFalse(sharepoint_q1.pdf_submitted)
+        self.assertGreaterEqual(len(response.context["reports"]), 1)
+        self.assertEqual(response.context["selected_quarter"], "q3")
+        self.assertIn("Client Q1", [report.client_name for report in response.context["reports"]])
 
 
 class SharePointTrackerImportTests(TestCase):
@@ -260,7 +198,7 @@ class SharePointTrackerImportTests(TestCase):
             command = ImportSharePointTrackerCommand()
             command.import_from_workbook(workbook_path)
 
-            entry = SharePointTrackerEntry.objects.get(quarter="q1", client_name="Client A")
+            entry = SharePointTrackerEntry.objects.get(client_name="Client A")
             self.assertTrue(entry.word_submitted)
             self.assertTrue(entry.excel_submitted)
             self.assertTrue(entry.pdf_submitted)

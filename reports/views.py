@@ -71,16 +71,33 @@ def actor_label(request, fallback_label):
 
 
 def get_quarterly_reports(quarter):
-    if quarter == "q1":
-        return list(ClientReport.objects.all())
+    if quarter in {"q2", "q3"}:
+        quarter_reports = list(ClientReport.objects.filter(quarter=quarter).order_by("operations_assignee", "crm_name", "client_name"))
+        if not quarter_reports:
+            for report in ClientReport.objects.filter(quarter="q1").order_by("operations_assignee", "crm_name", "client_name"):
+                ClientReport.objects.get_or_create(
+                    quarter=quarter,
+                    client_name=report.client_name,
+                    defaults={
+                        "crm_name": report.crm_name,
+                        "operations_assignee": report.operations_assignee,
+                        "due_date": report.due_date,
+                        "status_phase": StatusPhase.PENDING,
+                        "submitted_tick": False,
+                        "reviewed_tick": False,
+                        "sent_to_client_tick": False,
+                        "notes": report.notes,
+                    },
+                )
+        quarter_reports = list(ClientReport.objects.filter(quarter=quarter).order_by("operations_assignee", "crm_name", "client_name"))
+        for report in quarter_reports:
+            report.status_phase = StatusPhase.PENDING
+            report.submitted_tick = False
+            report.reviewed_tick = False
+            report.sent_to_client_tick = False
+        return quarter_reports
 
-    reports = list(ClientReport.objects.all())
-    for report in reports:
-        report.status_phase = StatusPhase.PENDING
-        report.submitted_tick = False
-        report.reviewed_tick = False
-        report.sent_to_client_tick = False
-    return reports
+    return list(ClientReport.objects.filter(quarter=quarter).order_by("operations_assignee", "crm_name", "client_name"))
 
 
 def filter_reports(reports, search_query="", status_filter=""):
@@ -332,18 +349,33 @@ def edit_report(request, pk):
 @access_key_required
 def sharepoint_tracker(request):
     selected_quarter = get_selected_quarter(request)
-    if selected_quarter == "q1" and not SharePointTrackerEntry.objects.exists():
+    if selected_quarter == "q1" and not SharePointTrackerEntry.objects.filter(quarter="q1").exists():
         call_command("import_sharepoint_tracker")
 
-    search_query = request.GET.get("q", "").strip()
-    entries = list(SharePointTrackerEntry.objects.all())
+    if selected_quarter in {"q2", "q3"}:
+        q1_entries = list(SharePointTrackerEntry.objects.filter(quarter="q1"))
+        if not SharePointTrackerEntry.objects.filter(quarter=selected_quarter).exists():
+            for entry in q1_entries:
+                SharePointTrackerEntry.objects.get_or_create(
+                    quarter=selected_quarter,
+                    client_name=entry.client_name,
+                    defaults={
+                        "crm_name": entry.crm_name,
+                        "alternate_name": entry.alternate_name,
+                        "word_submitted": entry.word_submitted,
+                        "excel_submitted": entry.excel_submitted,
+                        "pdf_submitted": entry.pdf_submitted,
+                        "due_date": entry.due_date,
+                        "notes": entry.notes,
+                    },
+                )
 
-    if selected_quarter == "q1":
-        for entry in entries:
-            entry.sync_status()
-            entry.save(update_fields=["status"])
-    elif selected_quarter in {"q2", "q3"}:
-        entries = []
+    search_query = request.GET.get("q", "").strip()
+    entries = list(SharePointTrackerEntry.objects.filter(quarter=selected_quarter))
+
+    for entry in entries:
+        entry.sync_status()
+        entry.save(update_fields=["status"])
 
     if search_query:
         entries = [
