@@ -1,7 +1,10 @@
+from datetime import date
+
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from crm.models import ActionItem
+from crm.models import ActionItem, MeetingLog
 
 
 class UnlockAccessFlowTests(TestCase):
@@ -25,6 +28,15 @@ class UnlockAccessFlowTests(TestCase):
 
     def test_general_passkey_allows_access(self):
         response = self.client.post(reverse('crm:unlock_access'), {'passkey': '10'})
+        self.assertRedirects(response, reverse('crm:dashboard'))
+
+        response = self.client.get(reverse('crm:client_action_items'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Alpha Client')
+        self.assertContains(response, 'Beta Client')
+
+    def test_legacy_general_passkey_still_allows_access(self):
+        response = self.client.post(reverse('crm:unlock_access'), {'passkey': '02'})
         self.assertRedirects(response, reverse('crm:dashboard'))
 
         response = self.client.get(reverse('crm:client_action_items'))
@@ -134,3 +146,28 @@ class UnlockAccessFlowTests(TestCase):
         response = self.client.post(reverse('crm:delete_history', args=[entry.pk]))
         self.assertRedirects(response, reverse('crm:admin_activity'))
         self.assertFalse(entry.__class__.objects.filter(pk=entry.pk).exists())
+
+    def test_merge_duplicate_clients_command_updates_accounts_and_removes_deleted_clients(self):
+        ActionItem.objects.create(client='Brands', action_item='BR-1', status='Open', owner='Tari')
+        ActionItem.objects.create(client='Brands Africa', action_item='BR-2', status='Open', owner='Tari')
+        ActionItem.objects.create(client='Datlabs', action_item='DEL-1', status='Open', owner='Tari')
+        ActionItem.objects.create(client='Masiye', action_item='MSI-1', status='Open', owner='Tari')
+        ActionItem.objects.create(client='Masiyepambili', action_item='MSI-2', status='Open', owner='Tari')
+        ActionItem.objects.create(client='NSSA PF', action_item='NSSA-1', status='Open', owner='Tari')
+        MeetingLog.objects.create(client='Brands', meeting_date=date(2026, 1, 15), attendees='A', summary='Merged', logged_by='Tari')
+        MeetingLog.objects.create(client='Datlabs', meeting_date=date(2026, 1, 16), attendees='B', summary='Delete this', logged_by='Tari')
+        MeetingLog.objects.create(client='Masiye', meeting_date=date(2026, 1, 17), attendees='C', summary='Merge this', logged_by='Tari')
+
+        call_command('merge_duplicate_clients')
+
+        self.assertFalse(ActionItem.objects.filter(client='Brands').exists())
+        self.assertTrue(ActionItem.objects.filter(client='Brands Africa').exists())
+        self.assertFalse(ActionItem.objects.filter(client='Datlabs').exists())
+        self.assertFalse(MeetingLog.objects.filter(client='Datlabs').exists())
+        self.assertFalse(ActionItem.objects.filter(client='Masiye').exists())
+        self.assertTrue(ActionItem.objects.filter(client='Masiyebambili').exists())
+        self.assertFalse(ActionItem.objects.filter(client='NSSA PF').exists())
+        self.assertTrue(ActionItem.objects.filter(client='NSSA').exists())
+        self.assertFalse(MeetingLog.objects.filter(client='Brands').exists())
+        self.assertTrue(MeetingLog.objects.filter(client='Brands Africa').exists())
+        self.assertTrue(MeetingLog.objects.filter(client='Masiyebambili').exists())

@@ -17,7 +17,8 @@ from reports.trail import build_change_details, log_dashboard_event
 
 
 ACCESS_SESSION_KEY = 'crm_access'
-GENERAL_PASSKEY = '02'
+GENERAL_PASSKEY = '10'
+LEGACY_GENERAL_PASSKEY = '02'
 ADMIN_PASSKEY = 'tari.crm@'
 OWNER_NAMES = [
     'Isaac', 'Welcome', 'IsaacGT', 'Tino', 'Godfrey',
@@ -127,7 +128,10 @@ def set_crm_access(request, role, owner=None):
 def resolve_passkey(passkey):
     token = normalize_access_value(passkey)
 
-    if token == normalize_access_value(GENERAL_PASSKEY):
+    if token in {
+        normalize_access_value(GENERAL_PASSKEY),
+        normalize_access_value(LEGACY_GENERAL_PASSKEY),
+    }:
         return {'role': 'general', 'message': 'General unlock access is enabled.'}
 
     if token == normalize_access_value(ADMIN_PASSKEY):
@@ -249,11 +253,7 @@ def exit_dashboard(request):
         request.session.modified = True
         messages.success(request, 'Session cleared. You have exited Client Relations.')
 
-    try:
-        reverse('consultancy_hub')
-    except NoReverseMatch:
-        return redirect('crm:unlock_access')
-    return redirect('consultancy_hub')
+    return redirect('crm:unlock_access')
 
 
 @crm_access_required
