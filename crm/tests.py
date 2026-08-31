@@ -52,6 +52,7 @@ class UnlockAccessFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Alpha Client')
         self.assertNotContains(response, 'Beta Client')
+        self.assertContains(response, 'New Action Item')
 
         item = ActionItem.objects.get(owner='Tari')
         response = self.client.get(reverse('crm:edit_action_item', args=[item.pk]))

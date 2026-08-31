@@ -30,6 +30,9 @@
         {% if q %}
             <a href="{% url 'crm:client_action_items' %}" class="rounded-xl border border-slate-300 px-5 py-3 text-center font-semibold text-slate-700 transition hover:bg-white">Clear</a>
         {% endif %}
+        {% if access_state.role == 'admin' or access_state.role == 'owner' %}
+            <a href="{% url 'crm:create_action_item' %}" class="rounded-xl bg-indigo-600 px-5 py-3 text-center font-semibold text-white transition hover:bg-indigo-500">New Action Item</a>
+        {% endif %}
     </form>
 </div>
 
