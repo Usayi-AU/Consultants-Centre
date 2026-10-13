@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.contrib import messages
+from django.db import transaction
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db.models import Case, Count, IntegerField, Q, Value, When
@@ -10,7 +11,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import AlternativeInvestmentItemForm, DashboardSettingsForm, ProposalForm, ReportStatusForm, SharePointTrackerEntryForm
+from .forms import (
+    AlternativeInvestmentItemForm,
+    DashboardSettingsForm,
+    ProposalForm,
+    ReportStatusForm,
+    ReportTrackerUploadForm,
+    SharePointTrackerEntryForm,
+)
 from .models import (
     AlternativeInvestmentItem,
     AltInvestmentStatus,
@@ -49,6 +57,7 @@ from .utils import (
     status_badge_class,
 )
 from .trail import build_change_details, log_dashboard_event
+from .tracker_upload import TrackerUploadError, import_tracker_workbook
 from crm.models import MeetingFeedbackSeenState, MeetingLog
 
 
@@ -371,6 +380,57 @@ def add_report(request):
         form = ReportStatusForm(instance=report)
 
     return render(request, "reports/report_form.html", {"form": form, "report": None, "quarter_label": quarter_label})
+
+
+@ops_admin_required
+@access_key_required
+def upload_report_tracker(request):
+    selected_quarter = get_selected_quarter(request)
+    quarter_label = QUARTER_OPTIONS[selected_quarter]
+    if request.method == "POST":
+        form = ReportTrackerUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            workbook = form.cleaned_data["workbook"]
+            try:
+                with transaction.atomic():
+                    result = import_tracker_workbook(
+                        workbook,
+                        selected_quarter,
+                        remove_missing=form.cleaned_data["remove_missing"],
+                    )
+            except TrackerUploadError as exc:
+                form.add_error("workbook", str(exc))
+            else:
+                summary = (
+                    f"{len(result.updated)} updated, {len(result.created)} added, {len(result.removed)} removed"
+                )
+                details = [f"File: {workbook.name} (sheet '{result.sheet_name}')", summary]
+                if result.created:
+                    details.append("Added: " + ", ".join(result.created))
+                if result.removed:
+                    details.append("Removed: " + ", ".join(result.removed))
+                if result.skipped:
+                    details.append("Skipped: " + ", ".join(result.skipped))
+                log_dashboard_event(
+                    dashboard_key="operations",
+                    event_type="updated",
+                    section_label=f"Report Tracker ({quarter_label})",
+                    record_label=workbook.name[:255],
+                    summary=f"Report Tracker for {quarter_label} was updated from an Excel upload.",
+                    details="\n".join(details),
+                    actor_label=actor_label(request, "Operations Admin"),
+                    metadata={"quarter": selected_quarter, "tracker": "report_tracker", "upload": workbook.name},
+                )
+                messages.success(request, f"{quarter_label} tracker updated from {workbook.name}: {summary}.")
+                if result.created:
+                    messages.info(request, "New clients added: " + ", ".join(result.created))
+                if result.skipped:
+                    messages.warning(request, "Skipped: " + ", ".join(result.skipped))
+                return redirect("report_tracker")
+    else:
+        form = ReportTrackerUploadForm()
+
+    return render(request, "reports/report_upload.html", {"form": form, "quarter_label": quarter_label})
 
 
 @ops_admin_required

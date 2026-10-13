@@ -13,6 +13,7 @@
                 <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950" href="{% url 'dashboard' %}">Back to Operations</a>
                 {% if show_edit_actions %}
                     <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href="{% url 'report_add' %}">Add client</a>
+                    <a class="rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100" href="{% url 'report_upload' %}">Upload Excel</a>
                 {% endif %}
             </div>
             <form method="get" class="grid gap-3 sm:grid-cols-[1fr_auto_auto]">

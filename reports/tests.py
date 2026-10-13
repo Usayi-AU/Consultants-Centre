@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -447,3 +448,93 @@ class SharePointTrackerEntryTests(TestCase):
         )
 
         self.assertEqual(entry.status, SharePointTrackerEntry.Status.COMPLETED)
+
+
+class ReportTrackerUploadTests(TestCase):
+    def setUp(self):
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = "q3"
+        session.save()
+
+    def _upload(self, rows, headers, remove_missing=False, title_rows=2):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Report Tracker"
+        worksheet.append(["INTELLEGO INVESTMENT CONSULTANTS  ·  Q3 2026 REPORT TRACKER"])
+        for _ in range(title_rows - 1):
+            worksheet.append([])
+        worksheet.append(headers)
+        for row in rows:
+            worksheet.append(row)
+        buffer = BytesIO()
+        workbook.save(buffer)
+        upload = SimpleUploadedFile(
+            "Q3 tracker.xlsx",
+            buffer.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        data = {"workbook": upload}
+        if remove_missing:
+            data["remove_missing"] = "on"
+        return self.client.post(reverse("report_upload"), data)
+
+    def test_upload_updates_existing_adds_new_and_maps_aliases(self):
+        ClientReport.objects.create(quarter="q3", client_name="ABC", crm_name="Tapiwa", operations_assignee="Anotida")
+        ClientReport.objects.create(quarter="q3", client_name="Marsh Employees PF", crm_name="Elvis", operations_assignee="Arnold")
+        ClientReport.objects.create(quarter="q3", client_name="Old Client", crm_name="Elvis", operations_assignee="Arnold")
+        ClientReport.objects.create(quarter="q1", client_name="ABC", crm_name="Tapiwa", operations_assignee="Anotida")
+        headers = ["Client Name", "CRM", "Alternate", "Operations", "Submitted", "Reviewed", "Sent to Client", "Due Date", "Status"]
+        rows = [
+            ["ABC", "Tariro", "Tatenda", "Simba", None, None, None, datetime(2026, 10, 14), "Pending"],
+            ["Bright/ Marsh", "Elvis", "Tinotenda", "Simba", "✓", "✓", None, datetime(2026, 10, 6), "Reviewed"],
+            ["Freda Rebecca", "Tatenda", "Tariro", "Simba", "✓", "✓", "✓", datetime(2026, 10, 7), "Complete"],
+        ]
+
+        response = self._upload(rows, headers)
+
+        self.assertEqual(response.status_code, 302)
+        abc = ClientReport.objects.get(quarter="q3", client_name="ABC")
+        self.assertEqual((abc.crm_name, abc.operations_assignee, abc.status_phase), ("Tariro", "Simba", "pending"))
+        self.assertEqual(str(abc.due_date), "2026-10-14")
+        marsh = ClientReport.objects.get(quarter="q3", client_name="Marsh Employees PF")
+        self.assertEqual((marsh.operations_assignee, marsh.status_phase), ("Simba", "reviewed"))
+        freda = ClientReport.objects.get(quarter="q3", client_name="Freda Rebecca")
+        self.assertEqual(freda.status_phase, "sent_to_client")
+        self.assertTrue(freda.sent_to_client_tick)
+        self.assertTrue(ClientReport.objects.filter(quarter="q3", client_name="Old Client").exists())
+        self.assertEqual(ClientReport.objects.get(quarter="q1", client_name="ABC").crm_name, "Tapiwa")
+        self.assertTrue(DashboardTrailEvent.objects.filter(summary__icontains="Excel upload").exists())
+
+    def test_upload_can_remove_clients_missing_from_file(self):
+        ClientReport.objects.create(quarter="q3", client_name="ABC", crm_name="Tariro", operations_assignee="Simba")
+        ClientReport.objects.create(quarter="q3", client_name="Old Client", crm_name="Elvis", operations_assignee="Arnold")
+        headers = ["Client Name", "CRM", "Operations", "Submitted", "Reviewed", "Sent to Client", "Due Date", "Status"]
+
+        response = self._upload([["ABC", "Tariro", "Simba", None, None, None, None, "Pending"]], headers, remove_missing=True)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ClientReport.objects.filter(quarter="q3", client_name="Old Client").exists())
+
+    def test_upload_skips_totals_row_in_original_layout(self):
+        headers = ["Client Name", "CRM", "Operations", "Submitted", "Reviewed", "Sent to Client", "Due Date", "Status"]
+        rows = [[None, None, 74, 67, 45, 42, None, None], ["ABC", "Tariro", "Simba", "✓", None, None, "14/10/2026", "Submitted"]]
+
+        self._upload(rows, headers)
+
+        self.assertEqual(list(ClientReport.objects.filter(quarter="q3").values_list("client_name", flat=True)), ["ABC"])
+        self.assertEqual(str(ClientReport.objects.get(quarter="q3").due_date), "2026-10-14")
+
+    def test_upload_without_required_headers_shows_error_and_changes_nothing(self):
+        ClientReport.objects.create(quarter="q3", client_name="ABC", crm_name="Tariro", operations_assignee="Simba")
+
+        response = self._upload([["ABC", "Tatenda"]], ["Client Name", "CRM"])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Could not find the tracker headers")
+        self.assertEqual(ClientReport.objects.get(quarter="q3").crm_name, "Tariro")

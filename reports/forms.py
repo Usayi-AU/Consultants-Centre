@@ -59,6 +59,30 @@ class ReportStatusForm(UniqueClientPerQuarterMixin, forms.ModelForm):
         return status_phase
 
 
+class ReportTrackerUploadForm(forms.Form):
+    workbook = forms.FileField(
+        label="Excel workbook",
+        widget=forms.ClearableFileInput(
+            attrs={
+                "accept": ".xlsx,.xlsm",
+                "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500",
+            }
+        ),
+    )
+    remove_missing = forms.BooleanField(
+        required=False,
+        label="Remove clients that are not in the file",
+    )
+
+    def clean_workbook(self):
+        workbook = self.cleaned_data["workbook"]
+        if not workbook.name.lower().endswith((".xlsx", ".xlsm")):
+            raise forms.ValidationError("Upload an Excel workbook (.xlsx).")
+        if workbook.size > 10 * 1024 * 1024:
+            raise forms.ValidationError("The file is larger than 10 MB.")
+        return workbook
+
+
 class SharePointTrackerEntryForm(UniqueClientPerQuarterMixin, forms.ModelForm):
     class Meta:
         model = SharePointTrackerEntry

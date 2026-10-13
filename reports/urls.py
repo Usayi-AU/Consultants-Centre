@@ -14,6 +14,7 @@ urlpatterns = [
     path("sharepoint-tracker/<int:pk>/delete/", views.delete_sharepoint_entry, name="delete_sharepoint_entry"),
     path("operations/", views.operations_staff_view, name="operations_staff"),
     path("reports/add/", views.add_report, name="report_add"),
+    path("reports/upload/", views.upload_report_tracker, name="report_upload"),
     path("reports/<int:pk>/edit/", views.edit_report, name="report_edit"),
     path("reports/<int:pk>/delete/", views.delete_report, name="report_delete"),
     path("dashboards/alternative-investments/", views.alt_investments_dashboard, name="alt_investments_dashboard"),
