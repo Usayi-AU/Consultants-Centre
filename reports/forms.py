@@ -17,11 +17,27 @@ from .models import (
 )
 
 
-class ReportStatusForm(forms.ModelForm):
+class UniqueClientPerQuarterMixin:
+    """Reject a client name already used by another row in the same quarter."""
+
+    def clean_client_name(self):
+        client_name = self.cleaned_data["client_name"].strip()
+        duplicates = self._meta.model.objects.filter(quarter=self.instance.quarter, client_name__iexact=client_name)
+        if self.instance.pk:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise forms.ValidationError("This client already exists in the selected quarter.")
+        return client_name
+
+
+class ReportStatusForm(UniqueClientPerQuarterMixin, forms.ModelForm):
     class Meta:
         model = ClientReport
-        fields = ["due_date", "status_phase", "notes"]
+        fields = ["client_name", "crm_name", "operations_assignee", "due_date", "status_phase", "notes"]
         widgets = {
+            "client_name": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "crm_name": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
+            "operations_assignee": forms.TextInput(attrs={"class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}),
             "due_date": forms.DateInput(
                 attrs={"type": "date", "class": "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500"}
             ),
@@ -43,7 +59,7 @@ class ReportStatusForm(forms.ModelForm):
         return status_phase
 
 
-class SharePointTrackerEntryForm(forms.ModelForm):
+class SharePointTrackerEntryForm(UniqueClientPerQuarterMixin, forms.ModelForm):
     class Meta:
         model = SharePointTrackerEntry
         fields = ["client_name", "crm_name", "alternate_name", "word_submitted", "excel_submitted", "pdf_submitted", "due_date", "notes"]

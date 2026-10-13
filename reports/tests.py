@@ -276,6 +276,9 @@ class DashboardTemplateTests(TestCase):
         response = self.client.post(
             reverse("report_edit", args=[report.pk]),
             {
+                "client_name": "Client Q2 Trail",
+                "crm_name": "CRM Trail",
+                "operations_assignee": "Ops Trail",
                 "status_phase": "submitted",
                 "submitted_tick": "on",
                 "reviewed_tick": "",
@@ -290,6 +293,62 @@ class DashboardTemplateTests(TestCase):
         self.assertTrue(
             DashboardTrailEvent.objects.filter(summary__icontains="Report status for").exists()
         )
+
+    def _admin_session(self, quarter):
+        session = self.client.session
+        session["access_key"] = ADMIN_ACCESS_KEY
+        session["access_level"] = "admin"
+        session["operations_dashboard_quarter"] = quarter
+        session.save()
+
+    def test_report_add_creates_row_in_selected_quarter(self):
+        self._admin_session("q3")
+        response = self.client.post(
+            reverse("report_add"),
+            {
+                "client_name": "New Client",
+                "crm_name": "Arnold",
+                "operations_assignee": "William",
+                "status_phase": "pending",
+                "due_date": "",
+                "notes": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        report = ClientReport.objects.get(client_name="New Client")
+        self.assertEqual((report.quarter, report.crm_name, report.operations_assignee), ("q3", "Arnold", "William"))
+
+    def test_report_add_rejects_duplicate_client_in_quarter(self):
+        ClientReport.objects.create(quarter="q3", client_name="Existing", crm_name="Elvis", operations_assignee="Anotida")
+        self._admin_session("q3")
+        response = self.client.post(
+            reverse("report_add"),
+            {"client_name": "existing", "crm_name": "Godfrey", "operations_assignee": "William", "status_phase": "pending"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ClientReport.objects.filter(quarter="q3", client_name__iexact="existing").count(), 1)
+
+    def test_report_delete_removes_row_and_logs_event(self):
+        report = ClientReport.objects.create(quarter="q3", client_name="To Delete", crm_name="Elvis", operations_assignee="Anotida")
+        self._admin_session("q3")
+        response = self.client.post(reverse("report_delete", args=[report.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ClientReport.objects.filter(pk=report.pk).exists())
+        self.assertTrue(DashboardTrailEvent.objects.filter(event_type="deleted", record_label="To Delete").exists())
+
+    def test_sharepoint_add_creates_row_in_selected_quarter(self):
+        self._admin_session("q2")
+        response = self.client.post(
+            reverse("add_sharepoint_entry"),
+            {"client_name": "SP Client", "crm_name": "Godfrey", "alternate_name": "Tariro", "due_date": "", "notes": ""},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        entry = SharePointTrackerEntry.objects.get(client_name="SP Client")
+        self.assertEqual((entry.quarter, entry.crm_name, entry.alternate_name), ("q2", "Godfrey", "Tariro"))
 
 
 class SharePointTrackerImportTests(TestCase):

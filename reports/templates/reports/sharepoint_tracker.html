@@ -11,6 +11,9 @@
             </div>
             <div class="flex flex-wrap items-center gap-3">
                 <a class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950" href="{% url 'dashboard' %}">Back to Operations</a>
+                {% if show_edit_actions %}
+                    <a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href="{% url 'add_sharepoint_entry' %}">Add client</a>
+                {% endif %}
                 <form method="get" class="w-full max-w-xl">
                     <input class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-teal-500" type="text" name="q" placeholder="Search client, CRM, or alternate" value="{{ search_query }}">
                 </form>

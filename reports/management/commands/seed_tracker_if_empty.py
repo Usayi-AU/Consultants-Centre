@@ -1,7 +1,8 @@
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 
-from reports.models import ClientReport
+from reports.crm_allocations import apply_crm_allocations
+from reports.models import ClientReport, SharePointTrackerEntry
 
 
 class Command(BaseCommand):
@@ -14,4 +15,5 @@ class Command(BaseCommand):
 
         self.stdout.write("No report records found. Importing tracker workbook...")
         call_command("import_tracker")
+        apply_crm_allocations(ClientReport, SharePointTrackerEntry)
         self.stdout.write(self.style.SUCCESS("Initial tracker data seeded."))

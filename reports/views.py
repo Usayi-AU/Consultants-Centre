@@ -313,6 +313,9 @@ def edit_report(request, pk):
             details = build_change_details(
                 form,
                 {
+                    "client_name": "Client",
+                    "crm_name": "CRM",
+                    "operations_assignee": "Operations",
                     "status_phase": "Status Phase",
                     "submitted_tick": "Submitted",
                     "reviewed_tick": "Reviewed",
@@ -340,6 +343,56 @@ def edit_report(request, pk):
         form = ReportStatusForm(instance=report)
 
     return render(request, "reports/report_form.html", {"form": form, "report": report})
+
+
+@ops_admin_required
+@access_key_required
+def add_report(request):
+    selected_quarter = get_selected_quarter(request)
+    quarter_label = QUARTER_OPTIONS[selected_quarter]
+    report = ClientReport(quarter=selected_quarter)
+    if request.method == "POST":
+        form = ReportStatusForm(request.POST, instance=report)
+        if form.is_valid():
+            form.save()
+            log_dashboard_event(
+                dashboard_key="operations",
+                event_type="created",
+                section_label=f"Report Tracker ({quarter_label})",
+                record_label=report.client_name,
+                summary=f"Report for {report.client_name} was added to {quarter_label}.",
+                details=f"CRM: {report.crm_name or '-'}; Operations: {report.operations_assignee or '-'}",
+                actor_label=actor_label(request, "Operations Admin"),
+                metadata={"quarter": selected_quarter, "tracker": "report_tracker"},
+            )
+            messages.success(request, f"Added {report.client_name} to {quarter_label}.")
+            return redirect("report_tracker")
+    else:
+        form = ReportStatusForm(instance=report)
+
+    return render(request, "reports/report_form.html", {"form": form, "report": None, "quarter_label": quarter_label})
+
+
+@ops_admin_required
+@access_key_required
+def delete_report(request, pk):
+    report = get_object_or_404(ClientReport, pk=pk)
+    if request.method == "POST":
+        record_label = report.client_name
+        quarter_label = QUARTER_OPTIONS.get(report.quarter, "Quarter")
+        report.delete()
+        log_dashboard_event(
+            dashboard_key="operations",
+            event_type="deleted",
+            section_label=f"Report Tracker ({quarter_label})",
+            record_label=record_label,
+            summary=f"Report for {record_label} in {quarter_label} was deleted.",
+            details="Record removed from report tracker.",
+            actor_label=actor_label(request, "Operations Admin"),
+            metadata={"quarter": report.quarter, "tracker": "report_tracker"},
+        )
+        messages.success(request, f"Deleted {record_label}.")
+    return redirect("report_tracker")
 
 
 @access_key_required
@@ -437,6 +490,34 @@ def edit_sharepoint_entry(request, pk):
         form = SharePointTrackerEntryForm(instance=entry)
 
     return render(request, "reports/sharepoint_entry_form.html", {"form": form, "entry": entry})
+
+
+@ops_admin_required
+@access_key_required
+def add_sharepoint_entry(request):
+    selected_quarter = get_selected_quarter(request)
+    quarter_label = QUARTER_OPTIONS[selected_quarter]
+    entry = SharePointTrackerEntry(quarter=selected_quarter)
+    if request.method == "POST":
+        form = SharePointTrackerEntryForm(request.POST, instance=entry)
+        if form.is_valid():
+            form.save()
+            log_dashboard_event(
+                dashboard_key="operations",
+                event_type="created",
+                section_label=f"SharePoint Tracker ({quarter_label})",
+                record_label=entry.client_name,
+                summary=f"SharePoint row for {entry.client_name} was added to {quarter_label}.",
+                details=f"CRM: {entry.crm_name or '-'}; Alternate: {entry.alternate_name or '-'}",
+                actor_label=actor_label(request, "Operations Admin"),
+                metadata={"quarter": selected_quarter, "tracker": "sharepoint_tracker"},
+            )
+            messages.success(request, f"Added {entry.client_name} to {quarter_label}.")
+            return redirect("sharepoint_tracker")
+    else:
+        form = SharePointTrackerEntryForm(instance=entry)
+
+    return render(request, "reports/sharepoint_entry_form.html", {"form": form, "entry": None, "quarter_label": quarter_label})
 
 
 @ops_admin_required

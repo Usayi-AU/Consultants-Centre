@@ -1,27 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Edit Report | Operations Reporting Dashboard{% endblock %}
+{% block title %}{% if report %}Edit Report{% else %}Add Client{% endif %} | Operations Reporting Dashboard{% endblock %}
 {% block content %}
 <div class="mx-auto max-w-2xl rounded-[2rem] border border-white/80 bg-white p-6 shadow-panel">
-    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Edit report status</p>
-    <h2 class="mt-1 text-3xl font-semibold text-slate-900">{{ report.client_name }}</h2>
-    <p class="mt-2 text-sm text-slate-600">Use this form to update the tracker phase and checking notes.</p>
+    {% if report %}
+        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Edit report status</p>
+        <h2 class="mt-1 text-3xl font-semibold text-slate-900">{{ report.client_name }}</h2>
+        <p class="mt-2 text-sm text-slate-600">Use this form to update the client allocation, tracker phase and checking notes.</p>
+    {% else %}
+        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Report Tracker</p>
+        <h2 class="mt-1 text-3xl font-semibold text-slate-900">Add client</h2>
+        <p class="mt-2 text-sm text-slate-600">The client will be added to the {{ quarter_label }} tracker.</p>
+    {% endif %}
 
     <form method="post" class="mt-6 space-y-5">
         {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div>
+            <label class="mb-2 block text-sm font-medium text-slate-700" for="id_client_name">Client name</label>
+            {{ form.client_name }}
+            {% for error in form.client_name.errors %}<p class="mt-1 text-sm text-rose-600">{{ error }}</p>{% endfor %}
+        </div>
+        <div class="grid gap-5 md:grid-cols-2">
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_crm_name">CRM</label>
+                {{ form.crm_name }}
+                {% for error in form.crm_name.errors %}<p class="mt-1 text-sm text-rose-600">{{ error }}</p>{% endfor %}
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-slate-700" for="id_operations_assignee">Operations</label>
+                {{ form.operations_assignee }}
+                {% for error in form.operations_assignee.errors %}<p class="mt-1 text-sm text-rose-600">{{ error }}</p>{% endfor %}
+            </div>
+        </div>
         <div>
             <label class="mb-2 block text-sm font-medium text-slate-700" for="id_due_date">Due date</label>
             {{ form.due_date }}
+            {% for error in form.due_date.errors %}<p class="mt-1 text-sm text-rose-600">{{ error }}</p>{% endfor %}
         </div>
         <div>
             <label class="mb-2 block text-sm font-medium text-slate-700" for="id_status_phase">Status phase</label>
             {{ form.status_phase }}
+            {% for error in form.status_phase.errors %}<p class="mt-1 text-sm text-rose-600">{{ error }}</p>{% endfor %}
         </div>
         <div>
             <label class="mb-2 block text-sm font-medium text-slate-700" for="id_notes">Note</label>
             {{ form.notes }}
         </div>
         <div class="flex items-center gap-3">
-            <button class="rounded-2xl bg-slate-950 px-5 py-3 font-semibold text-white" type="submit">Save changes</button>
+            <button class="rounded-2xl bg-slate-950 px-5 py-3 font-semibold text-white" type="submit">{% if report %}Save changes{% else %}Add client{% endif %}</button>
             <a class="rounded-2xl border border-slate-200 px-5 py-3 font-semibold text-slate-700" href="{% url 'report_tracker' %}">Cancel</a>
         </div>
     </form>
